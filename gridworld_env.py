@@ -33,7 +33,7 @@ class GridworldEnv:
     metadata = {'render.modes': ['human', 'rgb_array']}
     num_env = 0
 
-    def __init__(self, plan):
+    def __init__(self, plan, plan_txt=False):
         self.actions = [NOOP, UP, DOWN, LEFT, RIGHT]
         self.inv_actions = [0, 2, 1, 4, 3]
         self.action_space = spaces.Discrete(5)
@@ -43,8 +43,11 @@ class GridworldEnv:
 
         # initialize system state
         this_file_path = os.path.dirname(os.path.realpath(__file__))
-        self.grid_map_path = os.path.join(this_file_path, 'plan{}.txt'.format(plan))
-        self.start_grid_map = self._read_grid_map(self.grid_map_path)  # initial grid map
+        if not plan_txt:
+            self.grid_map_path = os.path.join(this_file_path, 'plan{}.txt'.format(plan))
+            self.start_grid_map = self._read_grid_map(self.grid_map_path)  # initial grid map
+        else:
+            self.start_grid_map = plan
         self.current_grid_map = copy.deepcopy(self.start_grid_map)  # current grid map
         self.grid_map_shape = self.start_grid_map.shape
         self.observation_space = spaces.Box(low=np.array([-1.0, -1.0, -1.0]),
@@ -179,11 +182,16 @@ class GridworldEnv:
     def close(self):
         self.viewer.close() if self.viewer else None
 
-    def _read_grid_map(self, grid_map_path):
+    def _read_grid_map(self, grid_map_path, file=True):
 
         # Return the gridmap imported from a txt plan
 
-        grid_map = open(grid_map_path, 'r').readlines()
+        if file:
+            grid_map = open(grid_map_path, 'r').readlines()
+        else:
+            grid_map = grid_map_path
+
+        print(grid_map)
         grid_map_array = []
         for k1 in grid_map:
             k1s = k1.split(' ')
