@@ -17,6 +17,12 @@ AGENT1 = D_RED = 4
 AGENT2 = L_RED = 5
 SUCCESS = PINK = 6
 
+# NOTe to Max: This isn't necessarily something you need to do, I'm just thinking abt whether this env makes it easy to connect to algorithms.
+# So the goal would be to do tabular RL: we would basically have a very large data structure with all the variables that define an agent's state
+# (i.e. the sextuple defined below) and then use an algo to learn the value of each of these (think of it like Q-Learning).
+# Just wanted you to think whether the environment makes sense to do this, since you know the code better.
+
+# NOTe to MAX: (the colour chocie is confusing imo, better if agent and its goal are same colour (but e.g. diff shades))
 # I made it so that agent 1 is a dark and agent 2 a light shade of green/red
 # This is only for visualising the environment
 COLORS = {BLACK: [0.0, 0.0, 0.0], GRAY: [0.5, 0.5, 0.5], D_GREEN: [0.0, 0.4, 0.0], L_GREEN: [0.5, 1.0, 0.5],
@@ -79,6 +85,8 @@ class GridworldEnv:
         # for gym
         self.viewer = None
 
+    # NOte to Max: they say in function get_state that this is for better performance of NN. So perhaps could u pls remove this normalisation?
+    # we dont need it in tabular
     def normalise_coordinates(self, coords):
         return 2. * (self.grid_map_shape[0] * coords[0] + coords[1]) / (
                 self.grid_map_shape[0] * self.grid_map_shape[1]) - 1.
@@ -88,6 +96,12 @@ class GridworldEnv:
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    # NOte: Max, is your code selecting the previous actions the agents took? 
+    # See section 4.1. of paper: their state representation (for single agent) has current location, the previous action of the agent,
+    # and the previous reward. Ideally, i think our state representation (for each agent, in Multi-agent setting!) 
+    # would be 
+    # the locations of both agents, the previous actions of both agents (just the latest, not entire history) and their previous reward!
+    # hard for me to see if that's what u are doing in this function
     def get_state_single(self, coordinates, action, reward, agent_idx):
         """
         Gets an updated game state (sextuplet), where one opposing player to the one mentioned by agent_idx
@@ -100,6 +114,8 @@ class GridworldEnv:
         return np.concatenate([you_new_game_state, op_game_state]) if agent_idx == 0 else np.concatenate(
             [op_game_state, you_new_game_state])
 
+    # NOTe: This function is currently doing a step only for one of the agents. We need it to do the step for both!
+    # Basically the agents need to take an action at the same time. If we separate it, player 2 knows where player 1 is moving
     def step(self, action, agent_idx):
 
         # Return next observation, reward, finished, success
