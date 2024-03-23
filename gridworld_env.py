@@ -204,12 +204,12 @@ class GridworldEnv:
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
             elif agent_idx==0 and target_position == TARGET1:
-                print("Agent 1")
+
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
                 self.move_completed[agent_idx] = True
                 rewards[agent_idx] = 1.0
             elif agent_idx==1 and target_position==TARGET2:
-                print("Agent 2")
+
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
                 self.move_completed[agent_idx] = True
                 rewards[agent_idx] = 1.0
@@ -237,7 +237,7 @@ class GridworldEnv:
             self.episode_total_reward += rewards[agent_idx]  # Update total reward
 
             if False not in self.move_completed:
-                print("Both agents")
+
                 new_state = np.asarray([updated_agent_coords_list[0][0], updated_agent_coords_list[0][1], actions[0], rewards[0],
                                 updated_agent_coords_list[1][0], updated_agent_coords_list[1][1], actions[1], rewards[1]])
                 return new_state, rewards, self.move_completed
