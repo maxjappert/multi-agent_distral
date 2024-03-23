@@ -92,6 +92,7 @@ class GridworldEnv:
         self.seed()
 
         self.episode_total_reward = 0.0
+        self.move_completed=[False,False]
 
         # for gym
         self.viewer = None
@@ -131,8 +132,6 @@ class GridworldEnv:
 
         # Return next observation, reward, finished, success
 
-        info = {'success': [False, False]}
-        move_completed = [False, False]
         rewards = [0.0, 0.0]
         #these will be actual coordinates after step
         new_agent_coords=[]
@@ -140,6 +139,11 @@ class GridworldEnv:
         updated_agent_coords_list=[]
         for agent_idx,action in enumerate(actions):
             action=int(action)
+
+            if agent_idx==0 and self.move_completed[0]:
+                action=0
+            elif agent_idx==1 and self.move_completed[1]:
+                action=0
 
             # Coordinates of each agent based on their action
             # note these might not be their final coordinates since we need to check validity of step
@@ -149,10 +153,21 @@ class GridworldEnv:
         
         # Check if the move is illegal
         for agent_idx,action in enumerate(actions):
+            
+            if self.move_completed[agent_idx]:
+
+                rewards[agent_idx]=0.0
+                new_agent_coords.append(self.current_agents_coords[agent_idx])
+                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
+
+                continue
             # Agent doesn't have to be moved if action is NOOP
             if action == NOOP:
-                info['success'][agent_idx] = True
+                
                 rewards[agent_idx]=0.0
+                new_agent_coords.append(self.current_agents_coords[agent_idx])
+                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
+                continue
                 #new_agent_coords.append(self.current_agents_coords[agent_idx])
                 #continue #go to next player
 
@@ -163,13 +178,15 @@ class GridworldEnv:
             # The move is illegal if it moves the agent out of bounds or if it collies with the opponent
             is_illegal_move = (updated_agent_coords_list[agent_idx][0] < 0 or updated_agent_coords_list[agent_idx][0] >= self.grid_map_shape[0]) or \
                             (updated_agent_coords_list[agent_idx][1] < 0 or updated_agent_coords_list[agent_idx][1] >= self.grid_map_shape[1]) or \
-                            (updated_agent_coords_list[agent_idx]==updated_agent_coords_list[opponent]) #check if both agents are moving to same location
+                            (updated_agent_coords_list[agent_idx]==updated_agent_coords_list[opponent]) or \
+                            (updated_agent_coords_list[agent_idx]==self.current_agents_coords[opponent])
 
             #if it's illegal, both agents stay at the same spot
             if is_illegal_move:
-                info['success'][agent_idx] = False
+                
                 rewards[agent_idx] = 0.0  # Update reward
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
+                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
 
             target_position = self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]]
@@ -181,44 +198,56 @@ class GridworldEnv:
                 elif agent_idx==1:
                     self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
             elif target_position == WALL:
-                info['success'][agent_idx] = False
+                
                 rewards[agent_idx] = 0.0  
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
+                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
-            elif agent_idx==0 and target_position == TARGET1 :
+            elif agent_idx==0 and target_position == TARGET1:
+                print("Agent 1")
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
+                self.move_completed[agent_idx] = True
+                rewards[agent_idx] = 1.0
             elif agent_idx==1 and target_position==TARGET2:
+                print("Agent 2")
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
+                self.move_completed[agent_idx] = True
+                rewards[agent_idx] = 1.0
         
-            # Replace the old agent coordinates with empty space
+            # Replace the old agent coordinates with value of previous state (might be blank, or the opponent's goal, or where the opponent moves to)
             if updated_agent_coords_list[agent_idx]!=self.current_agents_coords[agent_idx]:
-                self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = EMPTY
+
+                # if state is a target state
+                if copy.deepcopy(self.start_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]])==TARGET2:
+                    self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = TARGET2
+                elif copy.deepcopy(self.start_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]])==TARGET1:
+                    self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = TARGET1
+
+                # if the opponent moves to the square the player was just in. (this is no longer allowed!)
+                # Note if the current player is player 1 (idx=0), we dont want to update the square to empty, as that would mess with the checks of valid move for player 2
+                #elif updated_agent_coords_list[opponent]== self.current_agents_coords[agent_idx]:
+                #    if opponent==0:
+                 #       self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = AGENT1
+                else:
+                    self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = EMPTY
 
             # Apply update
             new_agent_coords.append(updated_agent_coords_list[agent_idx])
-            info['success'][agent_idx] = True
-
-            # If agent has reached the target
-            if updated_agent_coords_list[agent_idx] == self.agents_target_coords[agent_idx]:
-                move_completed[agent_idx] = True
-                rewards[agent_idx] = 1.0
 
             self.episode_total_reward += rewards[agent_idx]  # Update total reward
 
-            if False not in move_completed:
-                if self.restart_once_done:
-                    self.reset()
-                self.current_agents_coords = new_agent_coords
-                new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], rewards[0],
-                                new_agent_coords[1][0], new_agent_coords[1][1], actions[1], rewards[1]])
-                return new_state, rewards, move_completed, info
-        
-        self.current_agents_coords = new_agent_coords
+            if False not in self.move_completed:
+                print("Both agents")
+                new_state = np.asarray([updated_agent_coords_list[0][0], updated_agent_coords_list[0][1], actions[0], rewards[0],
+                                updated_agent_coords_list[1][0], updated_agent_coords_list[1][1], actions[1], rewards[1]])
+                return new_state, rewards, self.move_completed
+            
+        self.current_agents_coords=new_agent_coords
         new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], rewards[0],
                                 new_agent_coords[1][0], new_agent_coords[1][1], actions[1], rewards[1]])
 
     
-        return new_state, rewards, move_completed, info
+        return new_state, rewards, self.move_completed
 
 
     def reset(self):
@@ -228,7 +257,7 @@ class GridworldEnv:
         self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
         self.current_grid_map = copy.deepcopy(self.start_grid_map)
         self.episode_total_reward = 0.0
-
+        self.move_completed=[False,False]
         # This is the normalising code copied from the authors adapted to two players
         return [self.current_agents_coords[0][0],self.current_agents_coords[0][1], 0.0, 0.0,
                 self.current_agents_coords[1][0],self.current_agents_coords[1][1], 0.0, 0.0]
