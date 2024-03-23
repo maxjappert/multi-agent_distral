@@ -7,6 +7,7 @@ from gym import spaces
 import numpy as np
 import matplotlib.pyplot as plt
 from gym.utils import seeding
+from numba import jit
 
 # Used for the plan.txt files to define an environment
 EMPTY = BLACK = 0
@@ -121,6 +122,7 @@ class GridworldEnv:
         return state[agent_idx * agent_state_size:(agent_idx + 1) * agent_state_size]
 
     # Changed this so both agents act at the same time
+
     def step(self, actions):
         """
         Performs one step for both agents, given their actions
@@ -150,7 +152,7 @@ class GridworldEnv:
             # Agent doesn't have to be moved if action is NOOP
             if action == NOOP:
                 info['success'][agent_idx] = True
-                rewards[agent_idx]=0
+                rewards[agent_idx]=0.0
                 #new_agent_coords.append(self.current_agents_coords[agent_idx])
                 #continue #go to next player
 
@@ -197,20 +199,26 @@ class GridworldEnv:
             info['success'][agent_idx] = True
 
             # If agent has reached the target
-            if updated_agent_coords_list[agent_idx][0] == self.agents_target_coords[agent_idx][0] and updated_agent_coords_list[agent_idx][1] == self.agents_target_coords[agent_idx][1]:
+            if updated_agent_coords_list[agent_idx] == self.agents_target_coords[agent_idx]:
                 move_completed[agent_idx] = True
-                rewards[agent_idx] += 1.0
-                if self.restart_once_done:
-                    self.reset()
+                rewards[agent_idx] = 1.0
 
             self.episode_total_reward += rewards[agent_idx]  # Update total reward
+
+            if False not in move_completed:
+                if self.restart_once_done:
+                    self.reset()
+                self.current_agents_coords = new_agent_coords
+                new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], rewards[0],
+                                new_agent_coords[1][0], new_agent_coords[1][1], actions[1], rewards[1]])
+                return new_state, rewards, move_completed, info
         
         self.current_agents_coords = new_agent_coords
         new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], rewards[0],
                                 new_agent_coords[1][0], new_agent_coords[1][1], actions[1], rewards[1]])
 
-
-        return new_state, rewards, all(move_completed), info
+    
+        return new_state, rewards, move_completed, info
 
 
     def reset(self):
@@ -299,10 +307,3 @@ class GridworldEnv:
             plt.figure()
             plt.imshow(img)
             return
-
-import matplotlib.pyplot as plt
-import numpy as np
-#%matplotlib inline
-from gridworld_env import GridworldEnv
-
-env = GridworldEnv('') # Number of plan 
