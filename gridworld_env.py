@@ -80,8 +80,8 @@ class GridworldEnv:
         self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
 
         # Game state: (p1coords, p1action, p1reward, p2coords, p2action, p2reward)
-        self.current_game_state = np.asarray([self.current_agents_coords[0], 0., 0.,
-                                              self.current_agents_coords[1], 0., 0.])
+        self.current_game_state = np.asarray([self.reshape_coordinates(self.current_agents_coords[0]), 0., 0.,
+                                              self.reshape_coordinates(self.current_agents_coords[1]), 0., 0.])
 
         self.restart_once_done = False
 
@@ -93,11 +93,13 @@ class GridworldEnv:
         # for gym
         self.viewer = None
 
-    # NOte to Max: they say in function get_state that this is for better performance of NN. So perhaps could u pls remove this normalisation?
-    # we dont need it in tabular
-    #def normalise_coordinates(self, coords):
-    #    return 2. * (self.grid_map_shape[0] * coords[0] + coords[1]) / (
-    #            self.grid_map_shape[0] * self.grid_map_shape[1]) - 1.
+
+    def reshape_coordinates(self, coords):
+        """
+        Reshapes coordinates to work in a 1D array. Formerly called normalise_coordinates.
+        """
+        return 2. * (self.grid_map_shape[0] * coords[0] + coords[1]) / (
+                self.grid_map_shape[0] * self.grid_map_shape[1]) - 1.
 
     def seed(self, seed=None):
 
@@ -121,7 +123,7 @@ class GridworldEnv:
         """
         op_game_state = self.current_game_state[:3] if agent_idx == 1 else self.current_game_state[3:6]
 
-        you_new_game_state = np.asarray([coordinates, action, reward])
+        you_new_game_state = np.asarray([self.reshape_coordinates(coordinates), action, reward])
 
         return np.concatenate([you_new_game_state, op_game_state]) if agent_idx == 0 else np.concatenate(
             [op_game_state, you_new_game_state])
@@ -217,8 +219,8 @@ class GridworldEnv:
         self.episode_total_reward = 0.0
 
         # This is the normalising code copied from the authors adapted to two players
-        return [self.current_agents_coords[0], 0.0, 0.0,
-                self.current_agents_coords[1], 0.0, 0.0]
+        return [self.reshape_coordinates(self.current_agents_coords[0]), 0.0, 0.0,
+                self.reshape_coordinates(self.current_agents_coords[1]), 0.0, 0.0]
 
     def close(self):
         self.viewer.close() if self.viewer else None
