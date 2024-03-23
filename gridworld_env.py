@@ -12,8 +12,8 @@ from gym.utils import seeding
 EMPTY = BLACK = 0
 WALL = GRAY = 1
 TARGET1 = D_GREEN = 2
-TARGET2 = L_GREEN = 3
-AGENT1 = D_RED = 4
+TARGET2 = D_RED = 3
+AGENT1 = L_GREEN = 4
 AGENT2 = L_RED = 5
 SUCCESS = PINK = 6
 
@@ -25,8 +25,8 @@ SUCCESS = PINK = 6
 # NOTe to MAX: (the colour chocie is confusing imo, better if agent and its goal are same colour (but e.g. diff shades))
 # I made it so that agent 1 is a dark and agent 2 a light shade of green/red
 # This is only for visualising the environment
-COLORS = {BLACK: [0.0, 0.0, 0.0], GRAY: [0.5, 0.5, 0.5], D_GREEN: [0.0, 0.4, 0.0], L_GREEN: [0.5, 1.0, 0.5],
-          D_RED: [0.4, 0.0, 0.0], L_RED: [1.0, 0.5, 0.5], PINK: [1.0, 0.0, 1.0]}
+COLORS = {BLACK: [0.0, 0.0, 0.0], GRAY: [0.5, 0.5, 0.5], D_GREEN: [0.0, 0.4, 0.0],
+          D_RED: [0.4, 0.0, 0.0], L_GREEN: [0.5, 1.0, 0.5], L_RED: [1.0, 0.5, 0.5], PINK: [1.0, 0.0, 1.0]}
 
 NOOP = 0
 DOWN = 1
@@ -47,7 +47,8 @@ class GridworldEnv:
         self.inv_actions = [0, 2, 1, 4, 3]
 
         # Also not used anywhere
-        self.action_space = spaces.Discrete(5)
+        self.action_space = {0:spaces.Discrete(5),1:spaces.Discrete(5)}
+        #self.action_space_p1 = spaces.Discrete(5)
 
         # Position updates for each action
         self.action_pos_dict = {NOOP: [0, 0], UP: [-1, 0], DOWN: [1, 0], LEFT: [0, -1], RIGHT: [0, 1]}
@@ -67,9 +68,10 @@ class GridworldEnv:
         self.current_grid_map = copy.deepcopy(self.start_grid_map)  # current grid map
         self.grid_map_shape = self.start_grid_map.shape
 
-        # Don't know what this is
-        self.observation_space = spaces.Box(low=np.array([-1.0, -1.0, -1.0]),
-                                            high=np.array([1.0, 1.0, 1.0]))
+        # Specify bounds of observation space (we consider fully observable environment)
+        # Changed THIS, ISNT OBSERVATION A 5-TUPLE NOW?
+        self.observation_space = spaces.Box(low=np.array([-1.0, -1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0]),
+                                            high=np.array([8.0, 9.0, 5.0,1.0,8.0,9.0,5.0,1.0]))
 
         # agent state: start, target, current state
         (self.agent1_start_coords, self.agent1_target_coords,
@@ -79,9 +81,9 @@ class GridworldEnv:
         self.agents_target_coords = (self.agent1_target_coords, self.agent2_target_coords)
         self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
 
-        # Game state: (p1coords, p1action, p1reward, p2coords, p2action, p2reward)
-        self.current_game_state = np.asarray([self.reshape_coordinates(self.current_agents_coords[0]), 0., 0.,
-                                              self.reshape_coordinates(self.current_agents_coords[1]), 0., 0.])
+        # Game state: (p1 y coord, p1 x coord, p1action, p1reward, p2 y coord, p2 x coord, p2action, p2reward)
+        self.current_game_state = np.asarray([self.agents_start_coords[0][0],self.agents_start_coords[0][1], 0., 0.,
+                                              self.agents_start_coords[1][0],self.agents_start_coords[1][1], 0., 0.])
 
         self.restart_once_done = False
 
@@ -93,13 +95,12 @@ class GridworldEnv:
         # for gym
         self.viewer = None
 
+    # NOte to Max: they say in function get_state that this is for better performance of NN. So perhaps could u pls remove this normalisation?
+    # we dont need it in tabular
 
-    def reshape_coordinates(self, coords):
-        """
-        Reshapes coordinates to work in a 1D array. Formerly called normalise_coordinates.
-        """
-        return 2. * (self.grid_map_shape[0] * coords[0] + coords[1]) / (
-                self.grid_map_shape[0] * self.grid_map_shape[1]) - 1.
+    #def normalise_coordinates(self, coords):
+    #    return 2. * (self.grid_map_shape[0] * coords[0] + coords[1]) / (
+    #            self.grid_map_shape[0] * self.grid_map_shape[1]) - 1.
 
     def seed(self, seed=None):
 
@@ -112,103 +113,105 @@ class GridworldEnv:
     # would be 
     # the locations of both agents, the previous actions of both agents (just the latest, not entire history) and their previous reward!
     # hard for me to see if that's what u are doing in this function
-    def get_state_single(self, coordinates, action, reward, agent_idx):
+    def get_state_single(self, state, agent_idx):
         """
-        Gets an updated game state (sextuplet), where one opposing player to the one mentioned by agent_idx
-        stays fix (their coordinates, action, reward), while the agent_idx player is updated.
-
-        Game state:
-
-        (p1coords, p1action, p1reward, p2coords, p2action, p2reward)
+        Returns the state for the specified agent from the combined state.
         """
-        op_game_state = self.current_game_state[:3] if agent_idx == 1 else self.current_game_state[3:6]
+        agent_state_size = 4  # (x coord, y coord, action, reward)
+        return state[agent_idx * agent_state_size:(agent_idx + 1) * agent_state_size]
 
-        you_new_game_state = np.asarray([self.reshape_coordinates(coordinates), action, reward])
-
-        return np.concatenate([you_new_game_state, op_game_state]) if agent_idx == 0 else np.concatenate(
-            [op_game_state, you_new_game_state])
-
-    # NOTe: This function is currently doing a step only for one of the agents. We need it to do the step for both!
-    # Basically the agents need to take an action at the same time. If we separate it, player 2 knows where player 1 is moving
-    def step(self, action, agent_idx):
+    # Changed this so both agents act at the same time
+    def step(self, actions):
         """
-        Performs one step for the given agent and the given action.
-
+        Performs one step for both agents, given their actions
         Returns: new_state, reward, move_completed, info
         """
 
         # Return next observation, reward, finished, success
 
-        action = int(action)
-        info = {'success': False}
+        info = {'success': [False, False]}
+        move_completed = [False, False]
+        rewards = [0.0, 0.0]
+        #these will be actual coordinates after step
+        new_agent_coords=[]
+        #these will be tentative coordinates while we check if step is valid
+        updated_agent_coords_list=[]
+        for agent_idx,action in enumerate(actions):
+            action=int(action)
 
-        # Formerly named "done"
-        move_completed = False
-
-        # Penalties
-        penalty_step = 0.1
-        penalty_wall = 0.5
-
-        # Each step is penalised in order to minimise the number of steps
-        reward = -penalty_step
-        updated_agent_coords = (self.current_agents_coords[agent_idx][0] + self.action_pos_dict[action][0],
+            # Coordinates of each agent based on their action
+            # note these might not be their final coordinates since we need to check validity of step
+            updated_agent_coords = (self.current_agents_coords[agent_idx][0] + self.action_pos_dict[action][0],
                                 self.current_agents_coords[agent_idx][1] + self.action_pos_dict[action][1])
+            updated_agent_coords_list.append(updated_agent_coords)
+        
+        # Check if the move is illegal
+        for agent_idx,action in enumerate(actions):
+            # Agent doesn't have to be moved if action is NOOP
+            if action == NOOP:
+                info['success'][agent_idx] = True
+                rewards[agent_idx]=0
+                #new_agent_coords.append(self.current_agents_coords[agent_idx])
+                #continue #go to next player
 
-        # Agent doesn't have to be moved if action is NOOP
-        if action == NOOP:
-            info['success'] = True
-            self.episode_total_reward += reward  # Update total reward
-            return self.get_state_single(self.current_agents_coords[agent_idx], action, reward, agent_idx), reward, False, info
+            if agent_idx==0:
+                opponent=1
+            else:
+                opponent=0
+            # The move is illegal if it moves the agent out of bounds or if it collies with the opponent
+            is_illegal_move = (updated_agent_coords_list[agent_idx][0] < 0 or updated_agent_coords_list[agent_idx][0] >= self.grid_map_shape[0]) or \
+                            (updated_agent_coords_list[agent_idx][1] < 0 or updated_agent_coords_list[agent_idx][1] >= self.grid_map_shape[1]) or \
+                            (updated_agent_coords_list[agent_idx]==updated_agent_coords_list[opponent]) #check if both agents are moving to same location
 
-        # The opponent index is just the other index to the player index
-        op_idx = 0 if agent_idx == 1 else 1
+            #if it's illegal, both agents stay at the same spot
+            if is_illegal_move:
+                info['success'][agent_idx] = False
+                rewards[agent_idx] = 0.0  # Update reward
+                new_agent_coords.append(self.current_agents_coords[agent_idx])
+                continue
 
-        # Make a step
+            target_position = self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]]
 
-        # The move is illegal if it moves the agent out of bounds or if it collies with the opponent
-        is_illegal_move = (updated_agent_coords[0] < 0 or updated_agent_coords[0] >= self.grid_map_shape[0]) or \
-                          (updated_agent_coords[1] < 0 or updated_agent_coords[1] >= self.grid_map_shape[1]) or \
-                          (math.isclose(updated_agent_coords[0], self.current_agents_coords[op_idx][0]) and
-                           math.isclose(updated_agent_coords[1], self.current_agents_coords[op_idx][1]))
+            # Update the grid map
+            if target_position == EMPTY:
+                if agent_idx==0:
+                    self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT1
+                elif agent_idx==1:
+                    self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
+            elif target_position == WALL:
+                info['success'][agent_idx] = False
+                rewards[agent_idx] = 0.0  
+                new_agent_coords.append(self.current_agents_coords[agent_idx])
+                continue
+            elif agent_idx==0 and target_position == TARGET1 :
+                self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
+            elif agent_idx==1 and target_position==TARGET2:
+                self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
+        
+            # Replace the old agent coordinates with empty space
+            if updated_agent_coords_list[agent_idx]!=self.current_agents_coords[agent_idx]:
+                self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = EMPTY
 
-        if is_illegal_move:
-            info['success'] = False
-            self.episode_total_reward += reward  # Update total reward
-            return self.get_state_single(self.current_agents_coords[agent_idx], action, reward, agent_idx), reward, False, info
+            # Apply update
+            new_agent_coords.append(updated_agent_coords_list[agent_idx])
+            info['success'][agent_idx] = True
 
-        target_position = self.current_grid_map[updated_agent_coords[0], updated_agent_coords[1]]
+            # If agent has reached the target
+            if updated_agent_coords_list[agent_idx][0] == self.agents_target_coords[agent_idx][0] and updated_agent_coords_list[agent_idx][1] == self.agents_target_coords[agent_idx][1]:
+                move_completed[agent_idx] = True
+                rewards[agent_idx] += 1.0
+                if self.restart_once_done:
+                    self.reset()
 
-        # Update the grid map
+            self.episode_total_reward += rewards[agent_idx]  # Update total reward
+        
+        self.current_agents_coords = new_agent_coords
+        new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], rewards[0],
+                                new_agent_coords[1][0], new_agent_coords[1][1], actions[1], rewards[1]])
 
-        if target_position == EMPTY:
-            self.current_grid_map[updated_agent_coords[0], updated_agent_coords[1]] = AGENT1 if agent_idx == 0 else AGENT2
-        # No idea why they check for this again
-        elif target_position == WALL:
-            info['success'] = False
-            self.episode_total_reward += (reward - penalty_wall)  # Update total reward
-            return self.get_state_single(self.current_agents_coords[agent_idx], action, reward - penalty_wall, agent_idx), (
-                    reward - penalty_wall), False, info
-        # If the agent has reached their target
-        elif target_position == TARGET1 if agent_idx == 0 else TARGET2:
-            self.current_grid_map[updated_agent_coords[0], updated_agent_coords[1]] = SUCCESS
 
-        # Replace the old agent coordinates with empty space
-        self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = EMPTY
+        return new_state, rewards, all(move_completed), info
 
-        # Apply update
-        self.current_agents_coords[agent_idx] = copy.deepcopy(updated_agent_coords)
-        info['success'] = True
-
-        # If agent has reached
-        if updated_agent_coords[0] == self.agents_target_coords[agent_idx][0] and updated_agent_coords[1] == \
-                self.agents_target_coords[agent_idx][1]:
-            move_completed = True
-            reward += 1.0
-            if self.restart_once_done:
-                self.reset()
-
-        self.episode_total_reward += reward  # Update total reward
-        return self.get_state_single(self.current_agents_coords[agent_idx], action, reward, agent_idx), reward, move_completed, info
 
     def reset(self):
 
@@ -219,8 +222,8 @@ class GridworldEnv:
         self.episode_total_reward = 0.0
 
         # This is the normalising code copied from the authors adapted to two players
-        return [self.reshape_coordinates(self.current_agents_coords[0]), 0.0, 0.0,
-                self.reshape_coordinates(self.current_agents_coords[1]), 0.0, 0.0]
+        return [self.current_agents_coords[0][0],self.current_agents_coords[0][1], 0.0, 0.0,
+                self.current_agents_coords[1][0],self.current_agents_coords[1][1], 0.0, 0.0]
 
     def close(self):
         self.viewer.close() if self.viewer else None
@@ -234,7 +237,6 @@ class GridworldEnv:
         else:
             grid_map = grid_map_path
 
-        print(grid_map)
         grid_map_array = []
         for k1 in grid_map:
             k1s = k1.split(' ')
@@ -297,3 +299,10 @@ class GridworldEnv:
             plt.figure()
             plt.imshow(img)
             return
+
+import matplotlib.pyplot as plt
+import numpy as np
+#%matplotlib inline
+from gridworld_env import GridworldEnv
+
+env = GridworldEnv('') # Number of plan 
