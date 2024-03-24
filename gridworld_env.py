@@ -93,6 +93,8 @@ class GridworldEnv:
 
         self.episode_total_reward = 0.0
         self.move_completed=[False,False]
+        self.p1_total_reward=0
+        self.p2_total_reward=0
 
         # for gym
         self.viewer = None
@@ -131,7 +133,7 @@ class GridworldEnv:
         """
 
         # Return next observation, reward, finished, success
-
+        #wall_penalty=0.5
         rewards = [0.0, 0.0]
         #these will be actual coordinates after step
         new_agent_coords=[]
@@ -199,7 +201,7 @@ class GridworldEnv:
                     self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
             elif target_position == WALL:
                 
-                rewards[agent_idx] = 0.0  
+                rewards[agent_idx] = 0
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
@@ -208,11 +210,13 @@ class GridworldEnv:
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
                 self.move_completed[agent_idx] = True
                 rewards[agent_idx] = 1.0
+                self.p1_total_reward+=1
             elif agent_idx==1 and target_position==TARGET2:
 
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
                 self.move_completed[agent_idx] = True
                 rewards[agent_idx] = 1.0
+                self.p2_total_reward+=1
         
             # Replace the old agent coordinates with value of previous state (might be blank, or the opponent's goal, or where the opponent moves to)
             if updated_agent_coords_list[agent_idx]!=self.current_agents_coords[agent_idx]:
@@ -243,8 +247,8 @@ class GridworldEnv:
                 return new_state, rewards, self.move_completed
             
         self.current_agents_coords=new_agent_coords
-        new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], rewards[0],
-                                new_agent_coords[1][0], new_agent_coords[1][1], actions[1], rewards[1]])
+        new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], self.p1_total_reward,
+                                new_agent_coords[1][0], new_agent_coords[1][1], actions[1], self.p2_total_reward])
 
     
         return new_state, rewards, self.move_completed
@@ -258,6 +262,8 @@ class GridworldEnv:
         self.current_grid_map = copy.deepcopy(self.start_grid_map)
         self.episode_total_reward = 0.0
         self.move_completed=[False,False]
+        self.p1_total_reward=0
+        self.p2_total_reward=0
         # This is the normalising code copied from the authors adapted to two players
         return [self.current_agents_coords[0][0],self.current_agents_coords[0][1], 0.0, 0.0,
                 self.current_agents_coords[1][0],self.current_agents_coords[1][1], 0.0, 0.0]
