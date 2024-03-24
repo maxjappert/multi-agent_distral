@@ -72,7 +72,7 @@ class GridworldEnv:
         # Specify bounds of observation space (we consider fully observable environment)
         # Changed THIS, ISNT OBSERVATION A 5-TUPLE NOW?
         self.observation_space = spaces.Box(low=np.array([-1.0, -1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0]),
-                                            high=np.array([8.0, 9.0, 5.0,1.0,8.0,9.0,5.0,1.0]))
+                                            high=np.array([8.0, 9.0,8.0,9.0, 5.0,1.0,5.0,1.0]))
 
         # agent state: start, target, current state
         (self.agent1_start_coords, self.agent1_target_coords,
@@ -83,8 +83,9 @@ class GridworldEnv:
         self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
 
         # Game state: (p1 y coord, p1 x coord, p1action, p1reward, p2 y coord, p2 x coord, p2action, p2reward)
-        self.current_game_state = np.asarray([self.agents_start_coords[0][0],self.agents_start_coords[0][1], 0., 0.,
-                                              self.agents_start_coords[1][0],self.agents_start_coords[1][1], 0., 0.])
+        self.current_game_state = np.asarray([self.agents_start_coords[0][0],self.agents_start_coords[0][1], self.agents_start_coords[1][0],self.agents_start_coords[1][1],
+                                              0., 0.,
+                                               0., 0.])
 
         self.restart_once_done = False
 
@@ -111,19 +112,18 @@ class GridworldEnv:
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    # NOte: Max, is your code selecting the previous actions the agents took? 
-    # See section 4.1. of paper: their state representation (for single agent) has current location, the previous action of the agent,
-    # and the previous reward. Ideally, i think our state representation (for each agent, in Multi-agent setting!) 
-    # would be 
-    # the locations of both agents, the previous actions of both agents (just the latest, not entire history) and their previous reward!
-    # hard for me to see if that's what u are doing in this function
+
     def get_state_single(self, state, agent_idx):
         """
         Returns the state for the specified agent from the combined state.
         """
-        agent_state_size = 4  # (x coord, y coord, action, reward)
-        return state[agent_idx * agent_state_size:(agent_idx + 1) * agent_state_size]
-
+        # state of env has coordinates p1 +coordinates p2 + p1 prev action +  p1 reward so far + p2 prev action  + p2 reward so far
+        # state of each agent should be coordinates p1 + coordinates p2 + their own prev action  + other agent's reward so far
+        if agent_idx==0:
+            return state[:5]+[state[7]]
+        else:
+            return state[:4]+[state[6]]+[state[5]]
+        
     # Changed this so both agents act at the same time
 
     def step(self, actions):
@@ -242,13 +242,14 @@ class GridworldEnv:
 
             if False not in self.move_completed:
 
-                new_state = np.asarray([updated_agent_coords_list[0][0], updated_agent_coords_list[0][1], actions[0], rewards[0],
-                                updated_agent_coords_list[1][0], updated_agent_coords_list[1][1], actions[1], rewards[1]])
+                new_state = np.asarray([updated_agent_coords_list[0][0], updated_agent_coords_list[0][1], updated_agent_coords_list[1][0], 
+                                        updated_agent_coords_list[1][1], actions[0], rewards[0], actions[1], rewards[1]])
                 return new_state, rewards, self.move_completed
             
         self.current_agents_coords=new_agent_coords
-        new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], actions[0], self.p1_total_reward,
-                                new_agent_coords[1][0], new_agent_coords[1][1], actions[1], self.p2_total_reward])
+        new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], new_agent_coords[1][0], new_agent_coords[1][1], 
+                                actions[0], self.p1_total_reward,
+                                 actions[1], self.p2_total_reward])
 
     
         return new_state, rewards, self.move_completed
@@ -265,8 +266,8 @@ class GridworldEnv:
         self.p1_total_reward=0
         self.p2_total_reward=0
         # This is the normalising code copied from the authors adapted to two players
-        return [self.current_agents_coords[0][0],self.current_agents_coords[0][1], 0.0, 0.0,
-                self.current_agents_coords[1][0],self.current_agents_coords[1][1], 0.0, 0.0]
+        return [self.current_agents_coords[0][0],self.current_agents_coords[0][1], self.current_agents_coords[1][0],self.current_agents_coords[1][1], 0.0, 0.0,
+                 0.0, 0.0]
 
     def close(self):
         self.viewer.close() if self.viewer else None
