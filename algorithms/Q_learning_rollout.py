@@ -52,70 +52,87 @@ class Q_Learning_Rollout_Agents:
         return act1,act2
 
 
-    def learn(self,epsilon):
-        # one episode learning
+    def learn(self, epsilon):
         state = self.env.reset()
 
-        self.episode_reward_2=0
-        self.episode_reward_1=0
-        state=self.env.current_game_state
-        move_completed=[False,False]
-        agent_0_has_finished=False
-        agent_1_has_finished=False
+        self.episode_reward_2 = 0
+        self.episode_reward_1 = 0
+        state = self.env.current_game_state
+        move_completed = [False, False]
+        agent_0_has_finished = False
+        agent_1_has_finished = False
+
+        states_1 = [self.env.get_state_single(list(map(int, state)), 0)]
+        states_2 = [self.env.get_state_single(list(map(int, state)), 1)]
+        actions_1 = []
+        actions_2 = []
+        rewards_1 = []
+        rewards_2 = []
+
         for t in range(self.turn_limit):
+            act0, act1 = self.epsilon_greedy(self.env, epsilon)
+            next_state, rewards, move_completed = self.env.step([act0, act1])
+            act0 = int(act0)
+            act1 = int(act1)
 
-            # NEED TO CHANGE THIS SO THIS IS EPSILON GREEDY, NOT THIS RANDOM SAMPLE
+            a1_state = self.env.get_state_single(list(map(int, state)), 0)
+            a2_state = self.env.get_state_single(list(map(int, state)), 1)
+            a1_next_state = self.env.get_state_single(list(map(int, next_state)), 0)
+            a2_next_state = self.env.get_state_single(list(map(int, next_state)), 1)
 
-            #act0,act1 = env.action_space[0].sample(),env.action_space[1].sample()
-            act0,act1=self.epsilon_greedy(self.env,epsilon)
-            next_state, rewards,move_completed=self.env.step([act0,act1]) 
-            act0=int(act0)
-            act1=int(act1)
+            actions_1.append(act0)
+            actions_2.append(act1)
+            rewards_1.append(rewards[0])
+            rewards_2.append(rewards[1])
 
-            #act = self.env.action_space.sample() # random
-            #next_state, reward, done, info = self.env.step(act, self.idx)
-            assert len(next_state) == 8
-            a1_state=self.env.get_state_single(list(map(int,state)),0)
-            a2_state=self.env.get_state_single(list(map(int,state)),1)
-            a1_next_state=self.env.get_state_single(list(map(int,next_state)),0)
-            a2_next_state=self.env.get_state_single(list(map(int,next_state)),1)
-
-            #Env state has 8 variables. Each agent's state only has 7!
-            
-   
-            q_next_max_1=np.max(self.q_val_1[tuple(a1_next_state)])
-            q_next_max_2=np.max(self.q_val_2[tuple(a2_next_state)])
-
-            # Q <- Q + a(Q' - Q)
-            # <=> Q <- (1-a)Q + a(Q')
-
-            
-            if not agent_0_has_finished:
-                current_state_1=a1_state+[act0]
-                #print(current_state_1)
-                self.q_val_1[tuple(current_state_1)] = (1 -self.alpha) * self.q_val_1[tuple(current_state_1)]\
-                                 + self.alpha * (rewards[0] + self.gamma * q_next_max_1)
-            if not agent_1_has_finished:
-                current_state_2=a2_state+[act1]
-                self.q_val_2[tuple(current_state_2)] = (1 - self.alpha) * self.q_val_2[tuple(current_state_2)]\
-                                 + self.alpha * (rewards[1] + self.gamma * q_next_max_2)
             self.episode_reward_1 += rewards[0]
             self.episode_reward_2 += rewards[1]
-            #self.env.render()
 
-            # SET FLAGS SO THAT IF AGENT HAS REACHED GOAL, Q FUNCTION WONT BE UPDATED FROM NEXT ITERAITON ONWARDS
             if move_completed[0]:
-                agent_0_has_finished=True
+                agent_0_has_finished = True
             elif move_completed[1]:
-                agent_1_has_finished=True
+                agent_1_has_finished = True
 
-            if all(move_completed):
-                #print(str(t+1)+" steps")
-                return self.env.episode_total_reward,self.episode_reward_1,self.episode_reward_2
+            if all(move_completed) or len(states_1) >= 10:
+                # Rollout update for agent 1
+                for t in range(len(states_1) - 1):
+                    state_1 = states_1[t]
+                    action_1 = actions_1[t]
+                    reward_1 = rewards_1[t]
+                    next_state_1 = states_1[t + 1]
+
+                    q_next_max_1 = np.max(self.q_val_1[tuple(next_state_1)])
+                    td_target = reward_1 + self.gamma * q_next_max_1
+                    td_error = td_target - self.q_val_1[tuple(state_1 + [action_1])]
+                    self.q_val_1[tuple(state_1 + [action_1])] += self.alpha * td_error
+
+                # Rollout update for agent 2
+                for t in range(len(states_2) - 1):
+                    state_2 = states_2[t]
+                    action_2 = actions_2[t]
+                    reward_2 = rewards_2[t]
+                    next_state_2 = states_2[t + 1]
+
+                    q_next_max_2 = np.max(self.q_val_2[tuple(next_state_2)])
+                    td_target = reward_2 + self.gamma * q_next_max_2
+                    td_error = td_target - self.q_val_2[tuple(state_2 + [action_2])]
+                    self.q_val_2[tuple(state_2 + [action_2])] += self.alpha * td_error
+
+                states_1 = [a1_next_state]
+                states_2 = [a2_next_state]
+                actions_1 = []
+                actions_2 = []
+                rewards_1 = []
+                rewards_2 = []
+
+                if all(move_completed):
+                    return self.env.episode_total_reward, self.episode_reward_1, self.episode_reward_2
             else:
+                states_1.append(a1_next_state)
+                states_2.append(a2_next_state)
                 state = next_state
-        #print(str(t+1)+" steps")        
-        return self.env.episode_total_reward,self.episode_reward_1,self.episode_reward_2
+
+        return self.env.episode_total_reward, self.episode_reward_1, self.episode_reward_2
     """
     def test(self):
         state = self.env.reset()
