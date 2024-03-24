@@ -1,6 +1,6 @@
 import numpy as np
 
-class Q_Learning_rollout_Agents:
+class Q_Learning_Rollout_Agents:
 
     def __init__(self, env,LEARNING_COUNT,TURN_LIMIT,ALPHA,GAMMA,rollout):
         self.env = env
@@ -8,13 +8,15 @@ class Q_Learning_rollout_Agents:
         self.episode_reward_2 = 0.0
         #remember the actions in indices 2 and 6 are the previous actions, but this is simply part of the state (i.e. not the "a" in Q(s,a))
         # need to add another dim at the end to actually select next action
-        self.q_val_1 = np.zeros(9*10*5*2*9*10*5*2*5).reshape(9,10,5,2,9,10,5,2,5).astype(np.float32)
-        self.q_val_2 = np.zeros(9*10*5*2*9*10*5*2*5).reshape(9,10,5,2,9,10,5,2,5).astype(np.float32)
+
+        #Note that env state has all 8 variables, but each agent's state will only have 6 (discard the other agent's previous action and own agent's reward)
+        self.q_val_1 = np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
+        self.q_val_2 = np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
         self.lerning_count=LEARNING_COUNT
         self.turn_limit=TURN_LIMIT
         self.alpha=ALPHA 
         self.gamma=GAMMA
-        self.rollout=10
+        self.rollout=rollout
 
     def update_epsilon(self,episode, min_epsilon=0.01, max_epsilon=1.0, decay_rate=0.01):
         """
@@ -35,18 +37,19 @@ class Q_Learning_rollout_Agents:
 
     def epsilon_greedy(self,env,epsilon):
         random_numbers=np.random.rand(2)
-        current_state=list(map(int,env.current_game_state))
+        a1_state=self.env.get_state_single(list(map(int,env.current_game_state)),0)
+        a2_state=self.env.get_state_single(list(map(int,env.current_game_state)),1)
         if random_numbers[0]<epsilon:
-            act0=env.action_space[0].sample()
+            act1=env.action_space[0].sample()
         else:
-            act0=np.argmax(self.q_val_1[tuple(current_state)])
+            act1=np.argmax(self.q_val_1[tuple(a1_state)])
         
         if random_numbers[1]<epsilon:
-            act1=env.action_space[1].sample()
+            act2=env.action_space[1].sample()
         else:
-            act1=np.argmax(self.q_val_2[tuple(current_state)])
+            act2=np.argmax(self.q_val_2[tuple(a2_state)])
 
-        return act0,act1
+        return act1,act2
 
 
     def learn(self,epsilon):
@@ -72,23 +75,28 @@ class Q_Learning_rollout_Agents:
             #act = self.env.action_space.sample() # random
             #next_state, reward, done, info = self.env.step(act, self.idx)
             assert len(next_state) == 8
-            current_state=list(map(int,state))
-            next_state=list(map(int,next_state))
+            a1_state=self.env.get_state_single(list(map(int,state)),0)
+            a2_state=self.env.get_state_single(list(map(int,state)),1)
+            a1_next_state=self.env.get_state_single(list(map(int,next_state)),0)
+            a2_next_state=self.env.get_state_single(list(map(int,next_state)),1)
+
+            #Env state has 8 variables. Each agent's state only has 7!
+            
    
-            q_next_max_1=np.max(self.q_val_1[tuple(next_state)])
-            q_next_max_2=np.max(self.q_val_2[tuple(next_state)])
+            q_next_max_1=np.max(self.q_val_1[tuple(a1_next_state)])
+            q_next_max_2=np.max(self.q_val_2[tuple(a2_next_state)])
 
             # Q <- Q + a(Q' - Q)
             # <=> Q <- (1-a)Q + a(Q')
 
             
             if not agent_0_has_finished:
-                current_state_1=current_state+[act0]
+                current_state_1=a1_state+[act0]
                 #print(current_state_1)
                 self.q_val_1[tuple(current_state_1)] = (1 -self.alpha) * self.q_val_1[tuple(current_state_1)]\
                                  + self.alpha * (rewards[0] + self.gamma * q_next_max_1)
             if not agent_1_has_finished:
-                current_state_2=current_state+[act1]
+                current_state_2=a2_state+[act1]
                 self.q_val_2[tuple(current_state_2)] = (1 - self.alpha) * self.q_val_2[tuple(current_state_2)]\
                                  + self.alpha * (rewards[1] + self.gamma * q_next_max_2)
             self.episode_reward_1 += rewards[0]

@@ -201,7 +201,7 @@ class GridworldEnv:
                     self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
             elif target_position == WALL:
                 
-                rewards[agent_idx] = 0
+                rewards[agent_idx] = -1
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
@@ -328,7 +328,7 @@ class GridworldEnv:
                     observation[i * gs0:(i + 1) * gs0, j * gs1:(j + 1) * gs1, k] = this_value
         return (255 * observation).astype(np.uint8)
 
-    def render(self, mode='human', close=False):
+    def render(self, mode='human', close=False,aspect='auto'):
 
         # Returns a visualization of the environment according to specification
 
