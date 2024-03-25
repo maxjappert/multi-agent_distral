@@ -37,7 +37,7 @@ class MultiDistral_v1:
             action = np.random.choice(env.action_space[1].n, p=action_probs)
         return action
 
-    def learn(self):
+    def learn(self,record=False):
         state = self.env.reset()
         self.episode_reward_2 = 0
         self.episode_reward_1 = 0
@@ -52,11 +52,14 @@ class MultiDistral_v1:
         actions_2 = []
         rewards_1 = []
         rewards_2 = []
-
+        if record:
+            self.env.render(mode='write')
         for t in range(self.turn_limit):
             act0 = self.softmax_action_selection(self.env, states_1[-1], 0)
             act1 = self.softmax_action_selection(self.env, states_2[-1], 1)
             next_state, rewards, move_completed = self.env.step([act0, act1])
+            if record:
+                self.env.render(mode='write')
 
             a1_state = np.array(self.env.get_state_single(list(map(int, state)), 0), dtype=np.int32)
             a2_state = np.array(self.env.get_state_single(list(map(int, state)), 1), dtype=np.int32)

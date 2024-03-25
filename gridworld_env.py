@@ -203,7 +203,7 @@ class GridworldEnv:
                     self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
             elif target_position == WALL:
                 
-                rewards[agent_idx] = -1
+                rewards[agent_idx] = 0
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
