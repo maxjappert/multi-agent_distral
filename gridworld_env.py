@@ -102,13 +102,6 @@ class GridworldEnv:
         # for gym
         self.viewer = None
 
-    # NOte to Max: they say in function get_state that this is for better performance of NN. So perhaps could u pls remove this normalisation?
-    # we dont need it in tabular
-
-    #def normalise_coordinates(self, coords):
-    #    return 2. * (self.grid_map_shape[0] * coords[0] + coords[1]) / (
-    #            self.grid_map_shape[0] * self.grid_map_shape[1]) - 1.
-
     def seed(self, seed=None):
 
         self.np_random, seed = seeding.np_random(seed)
@@ -168,7 +161,7 @@ class GridworldEnv:
             # Agent doesn't have to be moved if action is NOOP
             if action == NOOP:
                 
-                rewards[agent_idx]=0.0
+                rewards[agent_idx]=-0.1
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
@@ -188,7 +181,7 @@ class GridworldEnv:
             #if it's illegal, both agents stay at the same spot
             if is_illegal_move:
                 
-                rewards[agent_idx] = 0.0  # Update reward
+                rewards[agent_idx] = -0.1  # Update reward
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
@@ -201,9 +194,10 @@ class GridworldEnv:
                     self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT1
                 elif agent_idx==1:
                     self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
+                rewards[agent_idx] = -0.1
             elif target_position == WALL:
                 
-                rewards[agent_idx] = 0
+                rewards[agent_idx] = -0.1
                 new_agent_coords.append(self.current_agents_coords[agent_idx])
                 updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
                 continue
@@ -211,13 +205,13 @@ class GridworldEnv:
 
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
                 self.move_completed[agent_idx] = True
-                rewards[agent_idx] = 1.0
+                rewards[agent_idx] = 100.0
                 self.p1_total_reward+=1
             elif agent_idx==1 and target_position==TARGET2:
 
                 self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
                 self.move_completed[agent_idx] = True
-                rewards[agent_idx] = 1.0
+                rewards[agent_idx] = 100.0
                 self.p2_total_reward+=1
         
             # Replace the old agent coordinates with value of previous state (might be blank, or the opponent's goal, or where the opponent moves to)
@@ -245,7 +239,7 @@ class GridworldEnv:
             if False not in self.move_completed:
 
                 new_state = np.asarray([updated_agent_coords_list[0][0], updated_agent_coords_list[0][1], updated_agent_coords_list[1][0], 
-                                        updated_agent_coords_list[1][1], actions[0], rewards[0], actions[1], rewards[1]])
+                                        updated_agent_coords_list[1][1], actions[0],self.p1_total_reward, actions[1], self.p2_total_reward])
                 return new_state, rewards, self.move_completed
             
         self.current_agents_coords=new_agent_coords

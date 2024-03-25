@@ -21,10 +21,14 @@ class Soft_Q_Learning_Baseline_Agents:
         if agent_id == 0:
             q_values = self.q_val_1[tuple(state)]
             action_probs = np.exp(q_values / self.tau) / np.sum(np.exp(q_values / self.tau))
+            action_probs=np.nan_to_num(action_probs)
+            #action_probs=action_probs/np.sum(action_probs)
             action = np.random.choice(env.action_space[0].n, p=action_probs)
         else:
             q_values = self.q_val_2[tuple(state)]
             action_probs = np.exp(q_values / self.tau) / np.sum(np.exp(q_values / self.tau))
+            action_probs=np.nan_to_num(action_probs)
+            #action_probs=action_probs/np.sum(action_probs)
             action = np.random.choice(env.action_space[1].n, p=action_probs)
         return action
 
