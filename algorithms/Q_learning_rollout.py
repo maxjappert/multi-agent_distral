@@ -2,7 +2,7 @@ import numpy as np
 
 class Q_Learning_Rollout_Agents:
 
-    def __init__(self, env,LEARNING_COUNT,TURN_LIMIT,ALPHA,GAMMA,rollout):
+    def __init__(self, env,LEARNING_COUNT,TURN_LIMIT,ALPHA,GAMMA,rollout,record=False):
         self.env = env
         self.episode_reward_1 = 0.0
         self.episode_reward_2 = 0.0
@@ -17,6 +17,7 @@ class Q_Learning_Rollout_Agents:
         self.alpha=ALPHA 
         self.gamma=GAMMA
         self.rollout=rollout
+        self.record=record
 
     def update_epsilon(self,episode, min_epsilon=0.01, max_epsilon=1.0, decay_rate=0.01):
         """
@@ -68,10 +69,13 @@ class Q_Learning_Rollout_Agents:
         actions_2 = []
         rewards_1 = []
         rewards_2 = []
-
+        if self.record:
+            self.env.render(mode='write')
         for t in range(self.turn_limit):
             act0, act1 = self.epsilon_greedy(self.env, epsilon)
             next_state, rewards, move_completed = self.env.step([act0, act1])
+            if self.record:
+                self.env.render('write')
             act0 = int(act0)
             act1 = int(act1)
 
@@ -131,7 +135,6 @@ class Q_Learning_Rollout_Agents:
                 states_1.append(a1_next_state)
                 states_2.append(a2_next_state)
                 state = next_state
-
         return self.env.episode_total_reward, self.episode_reward_1, self.episode_reward_2
     """
     def test(self):

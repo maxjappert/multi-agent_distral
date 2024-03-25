@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from gym.utils import seeding
 from numba import jit
+import os
 
 # Used for the plan.txt files to define an environment
 EMPTY = BLACK = 0
@@ -60,7 +61,7 @@ class GridworldEnv:
         # Initialise the state from either a plan.txt file or directly from string
         this_file_path = os.path.dirname(os.path.realpath(__file__))
         if not plan_txt:
-            self.grid_map_path = os.path.join(this_file_path, 'plan{}.txt'.format(plan))
+            self.grid_map_path = os.path.join(this_file_path, 'tasks/task{}.txt'.format(plan))
             self.start_grid_map = self._read_grid_map(self.grid_map_path)  # initial grid map
         else:
             self.start_grid_map = plan
@@ -88,6 +89,7 @@ class GridworldEnv:
                                                0., 0.])
 
         self.restart_once_done = False
+        self.grid_images=[]
 
         # Set seed
         self.seed()
@@ -258,7 +260,7 @@ class GridworldEnv:
     def reset(self):
 
         # Return the initial two states of the environment
-
+        self.grid_images=[]
         self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
         self.current_grid_map = copy.deepcopy(self.start_grid_map)
         self.episode_total_reward = 0.0
@@ -328,7 +330,7 @@ class GridworldEnv:
                     observation[i * gs0:(i + 1) * gs0, j * gs1:(j + 1) * gs1, k] = this_value
         return (255 * observation).astype(np.uint8)
 
-    def render(self, mode='human', close=False,aspect='auto'):
+    def render(self, mode='human', close=False):
 
         # Returns a visualization of the environment according to specification
 
@@ -343,3 +345,10 @@ class GridworldEnv:
             plt.figure()
             plt.imshow(img)
             return
+        elif mode=='write':
+            #if not os.path.exists("images/"):
+            #    os.makedirs("images/")
+            #plt.figure()
+            #plt.imshow(img)
+            self.grid_images.append(img)
+            #plt.savefig(f'images/anim{i}')
