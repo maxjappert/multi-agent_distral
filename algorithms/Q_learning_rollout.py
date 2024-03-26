@@ -58,6 +58,8 @@ class Q_Learning_Rollout_Agents:
         self.episode_reward_2 = 0
         self.episode_reward_1 = 0
         state = self.env.current_game_state
+        if record:
+            self.env.render(mode='write')
         move_completed = [False, False]
         agent_0_has_finished = False
         agent_1_has_finished = False
@@ -68,11 +70,24 @@ class Q_Learning_Rollout_Agents:
         actions_2 = []
         rewards_1 = []
         rewards_2 = []
+
+        act0, act1 = self.epsilon_greedy(self.env, epsilon)
+        actions_1.append(act0)
+        actions_2.append(act1)
+        next_state, next_rewards, move_completed = self.env.step([act0, act1])
+        rewards=[0,0]
+        rewards_1.append(rewards[0])
+        rewards_2.append(rewards[1])
+
+        state=next_state
+        rewards=next_rewards
         if record:
             self.env.render(mode='write')
+
+
         for t in range(self.turn_limit):
             act0, act1 = self.epsilon_greedy(self.env, epsilon)
-            next_state, rewards, move_completed = self.env.step([act0, act1])
+            next_state, next_rewards, move_completed = self.env.step([act0, act1])
             if record:
                 self.env.render('write')
             act0 = int(act0)
@@ -83,6 +98,8 @@ class Q_Learning_Rollout_Agents:
             a1_next_state = self.env.get_state_single(list(map(int, next_state)), 0)
             a2_next_state = self.env.get_state_single(list(map(int, next_state)), 1)
 
+            states_1.append(a1_state)
+            states_2.append(a2_state)
             actions_1.append(act0)
             actions_2.append(act1)
             rewards_1.append(rewards[0])
@@ -91,12 +108,9 @@ class Q_Learning_Rollout_Agents:
             self.episode_reward_1 += rewards[0]
             self.episode_reward_2 += rewards[1]
 
-            if move_completed[0]:
-                agent_0_has_finished = True
-            elif move_completed[1]:
-                agent_1_has_finished = True
-
             if all(move_completed) or len(states_1) >= 10:
+                if all(move_completed) and all(reward==0 for reward in rewards):
+                    return self.env.episode_total_reward, self.episode_reward_1, self.episode_reward_2
                 # Rollout update for agent 1
                 for t in range(len(states_1) - 1):
                     state_1 = states_1[t]
@@ -121,19 +135,17 @@ class Q_Learning_Rollout_Agents:
                     td_error = td_target - self.q_val_2[tuple(state_2 + [action_2])]
                     self.q_val_2[tuple(state_2 + [action_2])] += self.alpha * td_error
 
-                states_1 = [a1_next_state]
-                states_2 = [a2_next_state]
+                states_1 = []
+                states_2 = []
                 actions_1 = []
                 actions_2 = []
                 rewards_1 = []
                 rewards_2 = []
-
-                if all(move_completed):
-                    return self.env.episode_total_reward, self.episode_reward_1, self.episode_reward_2
-            else:
-                states_1.append(a1_next_state)
-                states_2.append(a2_next_state)
                 state = next_state
+                rewards=next_rewards
+            else:
+                state = next_state
+                rewards=next_rewards
         return self.env.episode_total_reward, self.episode_reward_1, self.episode_reward_2
     """
     def test(self):
