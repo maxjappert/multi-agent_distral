@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.special import logsumexp
 class Soft_without_rollout:
 
     def __init__(self, env,LEARNING_COUNT,TURN_LIMIT,ALPHA,GAMMA,TAU):
@@ -21,16 +21,22 @@ class Soft_without_rollout:
     def softmax_action_selection(self, env, state, agent_id):
         if agent_id == 0:
             q_values = self.q_val_1[tuple(state)]
-            action_probs = np.exp(q_values / self.tau) / np.sum(np.exp(q_values / self.tau))
+            log_action_probs = (q_values / self.tau)-logsumexp((q_values / self.tau))
             #action_probs=np.nan_to_num(action_probs)
             #action_probs=action_probs/np.sum(action_probs)
-            action = np.random.choice(env.action_space[0].n, p=action_probs)
+            #print(log_action_probs)
+            #probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
+            #print(probs)
+            action = np.random.choice(env.action_space[0].n, p=np.exp(log_action_probs))
         else:
             q_values = self.q_val_2[tuple(state)]
-            action_probs = np.exp(q_values / self.tau) / np.sum(np.exp(q_values / self.tau))
+            log_action_probs = (q_values / self.tau)-logsumexp((q_values / self.tau))
             #action_probs=np.nan_to_num(action_probs)
             #action_probs=action_probs/np.sum(action_probs)
-            action = np.random.choice(env.action_space[1].n, p=action_probs)
+            #print(log_action_probs)
+            #probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
+            #print(probs)
+            action = np.random.choice(env.action_space[0].n, p=np.exp(log_action_probs))
         return action
 
 
