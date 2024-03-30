@@ -1,348 +1,228 @@
-import math
-
-import sys
-import os
 import copy
-from gym import spaces
-import numpy as np
-import matplotlib.pyplot as plt
-from gym.utils import seeding
-from numba import jit
+import itertools
 import os
+import random
+import sys
 
-# Used for the plan.txt files to define an environment
-EMPTY = BLACK = 0
-WALL = GRAY = 1
-TARGET1 = D_GREEN = 2
-TARGET2 = D_RED = 3
-AGENT1 = L_GREEN = 4
-AGENT2 = L_RED = 5
-SUCCESS = PINK = 6
+import numpy as np
+from gym import spaces, Env
+from gym.utils import seeding
+import matplotlib.pyplot as plt
 
-# NOTe to Max: This isn't necessarily something you need to do, I'm just thinking abt whether this env makes it easy to connect to algorithms.
-# So the goal would be to do tabular RL: we would basically have a very large data structure with all the variables that define an agent's state
-# (i.e. the sextuple defined below) and then use an algo to learn the value of each of these (think of it like Q-Learning).
-# Just wanted you to think whether the environment makes sense to do this, since you know the code better.
+# Define the environment's elements
+EMPTY, WALL, TARGET1, TARGET2, AGENT1, AGENT2, SUCCESS, TARGET1_OC2, TARGET2_OC1 = range(9)
+ACTIONS = [NOOP, UP, DOWN, LEFT, RIGHT] = range(5)
 
-# NOTe to MAX: (the colour chocie is confusing imo, better if agent and its goal are same colour (but e.g. diff shades))
-# I made it so that agent 1 is a dark and agent 2 a light shade of green/red
-# This is only for visualising the environment
-COLORS = {BLACK: [0.0, 0.0, 0.0], GRAY: [0.5, 0.5, 0.5], D_GREEN: [0.0, 0.4, 0.0],
-          D_RED: [0.4, 0.0, 0.0], L_GREEN: [0.5, 1.0, 0.5], L_RED: [1.0, 0.5, 0.5], PINK: [1.0, 0.0, 1.0]}
+# Define colors for rendering
+COLORS = {
+    EMPTY: [1.0, 1.0, 1.0],  # White
+    WALL: [0.0, 0.0, 0.0],  # Black
+    TARGET1: [0.0, 0.5, 0.0],  # Dark Green
+    TARGET2: [0.5, 0.0, 0.0],  # Dark Red
+    AGENT1: [0.5, 1.0, 0.5],  # Light Green
+    AGENT2: [1.0, 0.5, 0.5],  # Light Red
+    SUCCESS: [1.0, 0.0, 1.0],  # Pink
+    TARGET1_OC2: [0.5, 0.5, 0.5],
+    TARGET2_OC1: [0.5, 0.5, 0.5],
+    TARGET2_OC1: [0.5, 0.5, 0.5]
+}
 
-NOOP = 0
-DOWN = 1
-UP = 2
-LEFT = 3
-RIGHT = 4
+# Define the action to position update mapping
+ACTION_EFFECTS = {
+    NOOP: (0, 0),
+    UP: (-1, 0),
+    DOWN: (1, 0),
+    LEFT: (0, -1),
+    RIGHT: (0, 1),
+}
 
 
-class GridworldEnv:
+class GridworldEnv(Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
-    num_env = 0
 
-    def __init__(self, plan, plan_txt=False):
-        # NOOP means not moving
-        self.actions = [NOOP, UP, DOWN, LEFT, RIGHT]
+    def __init__(self, plan, from_file=True):
+        super(GridworldEnv, self).__init__()
+        self.action_space = spaces.Discrete(len(ACTIONS))
+        self.action_combinations = list(itertools.product(ACTIONS, repeat=2))
 
-        # No idea what this is, not used anywhere in the code
-        self.inv_actions = [0, 2, 1, 4, 3]
-
-        # Also not used anywhere
-        self.action_space = {0:spaces.Discrete(5),1:spaces.Discrete(5)}
-        #self.action_space_p1 = spaces.Discrete(5)
-
-        # Position updates for each action
-        self.action_pos_dict = {NOOP: [0, 0], UP: [-1, 0], DOWN: [1, 0], LEFT: [0, -1], RIGHT: [0, 1]}
-
-        # For state visualisation
-        self.img_shape = [256, 256, 3]
-
-        # Initialise the state from either a plan.txt file or directly from string
-        this_file_path = os.path.dirname(os.path.realpath(__file__))
-        if not plan_txt:
-            self.grid_map_path = os.path.join(this_file_path, 'tasks/task{}.txt'.format(plan))
-            self.start_grid_map = self._read_grid_map(self.grid_map_path)  # initial grid map
+        # Load the grid map
+        if from_file:
+            this_file_path = os.path.dirname(os.path.realpath(__file__))
+            grid_map_path = os.path.join(this_file_path, 'tasks/task{}.txt'.format(plan))
+            self.start_grid_map = self._read_grid_map(grid_map_path)
         else:
-            self.start_grid_map = plan
+            self.start_grid_map = np.array(plan, dtype=int)
 
-        # The grid map is a 2D-array of integers representing what each square is (wall, goal, agent, etc.)
-        self.current_grid_map = copy.deepcopy(self.start_grid_map)  # current grid map
-        self.grid_map_shape = self.start_grid_map.shape
+        self.current_grid_map = np.copy(self.start_grid_map)
+        self.observation_space = spaces.Box(low=0, high=max(EMPTY, WALL, TARGET1, TARGET2, AGENT1, AGENT2, SUCCESS),
+                                            shape=self.current_grid_map.shape, dtype=int)
 
-        # Specify bounds of observation space (we consider fully observable environment)
-        # Changed THIS, ISNT OBSERVATION A 5-TUPLE NOW?
-        self.observation_space = spaces.Box(low=np.array([-1.0, -1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0]),
-                                            high=np.array([8.0, 9.0,8.0,9.0, 5.0,1.0,5.0,1.0]))
-
-        # agent state: start, target, current state
-        (self.agent1_start_coords, self.agent1_target_coords,
-         self.agent2_start_coords, self.agent2_target_coords) = self._get_agents_start_target_state()
-
-        self.agents_start_coords = (self.agent1_start_coords, self.agent2_start_coords)
-        self.agents_target_coords = (self.agent1_target_coords, self.agent2_target_coords)
-        self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
-
-        # Game state: (p1 y coord, p1 x coord, p1action, p1reward, p2 y coord, p2 x coord, p2action, p2reward)
-        self.current_game_state = np.asarray([self.agents_start_coords[0][0],self.agents_start_coords[0][1], self.agents_start_coords[1][0],self.agents_start_coords[1][1],
-                                              0., 0.,
-                                               0., 0.])
-
-        self.restart_once_done = False
-        self.grid_images=[]
-
-        # Set seed
+        # Initialize agents' states
+        self.agents_start_coords, self.agents_target_coords = self._find_agents_and_targets()
+        self.current_agents_coords = np.copy(self.agents_start_coords)
+        self.move_completed = [False, False]
+        self.episode_total_reward = 0.0
+        self.viewer = None
         self.seed()
 
-        self.episode_total_reward = 0.0
-        self.move_completed=[False,False]
-        self.p1_total_reward=0
-        self.p2_total_reward=0
-
-        # for gym
-        self.viewer = None
-
     def seed(self, seed=None):
-
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    def get_legal_action_pairs(self):
+        legal_action_pairs = []
 
-    def get_state_single(self, state, agent_idx):
-        """
-        Returns the state for the specified agent from the combined state.
-        """
-        # state of env has coordinates p1 +coordinates p2 + p1 prev action +  p1 reward so far + p2 prev action  + p2 reward so far
-        # state of each agent should be coordinates p1 + coordinates p2 + their own prev action  + other agent's reward so far
-        if agent_idx==0:
-            return state[:5]+[state[7]]
-        else:
-            return state[:4]+[state[6]]+[state[5]]
-        
-    # Changed this so both agents act at the same time
+        for comb in self.action_combinations:
+            if self.move_legal(comb):
+                legal_action_pairs.append(comb)
+
+        return legal_action_pairs
+
+    def move_legal(self, action_pair):
+
+        # If an agent has reached their goal, they can only remain where they are
+        if self.move_completed[0] == True and action_pair[0] != NOOP:
+            return False
+
+        if self.move_completed[1] == True and action_pair[1] != NOOP:
+            return False
+
+        dy_1, dx_1 = ACTION_EFFECTS[action_pair[0]]
+        dy_2, dx_2 = ACTION_EFFECTS[action_pair[1]]
+        y_1, x_1 = self.current_agents_coords[0][0] + dy_1, self.current_agents_coords[0][1] + dx_1
+        y_2, x_2 = self.current_agents_coords[1][0] + dy_2, self.current_agents_coords[1][1] + dx_2
+
+        return (self._within_bounds(y_1, x_1) and self._within_bounds(y_2, x_2)
+                and self.current_grid_map[y_1, x_1] != WALL and self.current_grid_map[y_2, x_2] != WALL
+                and (y_1, x_1) != (y_2, x_2))
 
     def step(self, actions):
-        """
-        Performs one step for both agents, given their actions
-        Returns: new_state, reward, move_completed, info
-        """
-
-        # Return next observation, reward, finished, success
-        #wall_penalty=0.5
         rewards = [0.0, 0.0]
-        #these will be actual coordinates after step
-        new_agent_coords=[]
-        #these will be tentative coordinates while we check if step is valid
-        updated_agent_coords_list=[]
-        for agent_idx,action in enumerate(actions):
-            action=int(action)
+        new_agent_coords = np.copy(self.current_agents_coords)
 
-            if agent_idx==0 and self.move_completed[0]:
-                action=0
-            elif agent_idx==1 and self.move_completed[1]:
-                action=0
-
-            # Coordinates of each agent based on their action
-            # note these might not be their final coordinates since we need to check validity of step
-            updated_agent_coords = (self.current_agents_coords[agent_idx][0] + self.action_pos_dict[action][0],
-                                self.current_agents_coords[agent_idx][1] + self.action_pos_dict[action][1])
-            updated_agent_coords_list.append(updated_agent_coords)
-        
-        # Check if the move is illegal
-        for agent_idx,action in enumerate(actions):
-            
+        for agent_idx, action in enumerate(actions):
             if self.move_completed[agent_idx]:
-
-                rewards[agent_idx]=0.0
-                new_agent_coords.append(self.current_agents_coords[agent_idx])
-                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
-
                 continue
-            # Agent doesn't have to be moved if action is NOOP
-            if action == NOOP:
-                
-                rewards[agent_idx]=-0.1
-                new_agent_coords.append(self.current_agents_coords[agent_idx])
-                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
-                continue
-                #new_agent_coords.append(self.current_agents_coords[agent_idx])
-                #continue #go to next player
 
-            if agent_idx==0:
-                opponent=1
+            dy, dx = ACTION_EFFECTS[action]
+            y, x = self.current_agents_coords[agent_idx]
+            new_y, new_x = y + dy, x + dx
+
+            # Check for illegal moves
+            if not self._within_bounds(new_y, new_x) or self.current_grid_map[new_y, new_x] == WALL:
+                rewards[agent_idx] = -0.1
+                continue
+
+            if self._target_reached(agent_idx, new_y, new_x):
+                self.move_completed[agent_idx] = True
+                rewards[agent_idx] = 100.0
+                self.current_grid_map[new_y, new_x] = SUCCESS
             else:
-                opponent=0
-            # The move is illegal if it moves the agent out of bounds or if it collies with the opponent
-            is_illegal_move = (updated_agent_coords_list[agent_idx][0] < 0 or updated_agent_coords_list[agent_idx][0] >= self.grid_map_shape[0]) or \
-                            (updated_agent_coords_list[agent_idx][1] < 0 or updated_agent_coords_list[agent_idx][1] >= self.grid_map_shape[1]) or \
-                            (updated_agent_coords_list[agent_idx]==updated_agent_coords_list[opponent]) or \
-                            (updated_agent_coords_list[agent_idx]==self.current_agents_coords[opponent])
-
-            #if it's illegal, both agents stay at the same spot
-            if is_illegal_move:
-                
-                rewards[agent_idx] = -0.1  # Update reward
-                new_agent_coords.append(self.current_agents_coords[agent_idx])
-                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
-                continue
-
-            target_position = self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]]
-
-            # Update the grid map
-            if target_position == EMPTY:
-                if agent_idx==0:
-                    self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT1
-                elif agent_idx==1:
-                    self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = AGENT2
                 rewards[agent_idx] = -0.1
-            elif target_position == WALL:
-                
-                rewards[agent_idx] = -0.1
-                new_agent_coords.append(self.current_agents_coords[agent_idx])
-                updated_agent_coords_list[agent_idx]=self.current_agents_coords[agent_idx]
-                continue
-            elif agent_idx==0 and target_position == TARGET1:
+                new_agent_coords[agent_idx] = [new_y, new_x]
 
-                self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
-                self.move_completed[agent_idx] = True
-                rewards[agent_idx] = 100.0
-                self.p1_total_reward+=1
-            elif agent_idx==1 and target_position==TARGET2:
+        self._update_grid_map(self.current_agents_coords, new_agent_coords)
+        self.current_agents_coords = new_agent_coords
 
-                self.current_grid_map[updated_agent_coords_list[agent_idx][0], updated_agent_coords_list[agent_idx][1]] = SUCCESS
-                self.move_completed[agent_idx] = True
-                rewards[agent_idx] = 100.0
-                self.p2_total_reward+=1
-        
-            # Replace the old agent coordinates with value of previous state (might be blank, or the opponent's goal, or where the opponent moves to)
-            if updated_agent_coords_list[agent_idx]!=self.current_agents_coords[agent_idx]:
-
-                # if state is a target state
-                if copy.deepcopy(self.start_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]])==TARGET2:
-                    self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = TARGET2
-                elif copy.deepcopy(self.start_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]])==TARGET1:
-                    self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = TARGET1
-
-                # if the opponent moves to the square the player was just in. (this is no longer allowed!)
-                # Note if the current player is player 1 (idx=0), we dont want to update the square to empty, as that would mess with the checks of valid move for player 2
-                #elif updated_agent_coords_list[opponent]== self.current_agents_coords[agent_idx]:
-                #    if opponent==0:
-                 #       self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = AGENT1
-                else:
-                    self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = EMPTY
-
-            # Apply update
-            new_agent_coords.append(updated_agent_coords_list[agent_idx])
-
-            self.episode_total_reward += rewards[agent_idx]  # Update total reward
-
-            if False not in self.move_completed:
-
-                new_state = np.asarray([updated_agent_coords_list[0][0], updated_agent_coords_list[0][1], updated_agent_coords_list[1][0], 
-                                        updated_agent_coords_list[1][1], actions[0],self.p1_total_reward, actions[1], self.p2_total_reward])
-                return new_state, rewards, self.move_completed
-            
-        self.current_agents_coords=new_agent_coords
-        new_state = np.asarray([new_agent_coords[0][0], new_agent_coords[0][1], new_agent_coords[1][0], new_agent_coords[1][1], 
-                                actions[0], self.p1_total_reward,
-                                 actions[1], self.p2_total_reward])
-
-    
-        return new_state, rewards, self.move_completed
-
+        # Update game state and check if episode is done
+        done = all(self.move_completed)
+        return self._get_obs(), rewards, done
 
     def reset(self):
-
-        # Return the initial two states of the environment
-        self.grid_images=[]
-        self.current_agents_coords = [copy.deepcopy(self.agent1_start_coords), copy.deepcopy(self.agent2_start_coords)]
-        self.current_grid_map = copy.deepcopy(self.start_grid_map)
+        self.current_grid_map = np.copy(self.start_grid_map)
+        self.current_agents_coords = np.copy(self.agents_start_coords)
+        self.move_completed = [False, False]
         self.episode_total_reward = 0.0
-        self.move_completed=[False,False]
-        self.p1_total_reward=0
-        self.p2_total_reward=0
-        # This is the normalising code copied from the authors adapted to two players
-        return [self.current_agents_coords[0][0],self.current_agents_coords[0][1], self.current_agents_coords[1][0],self.current_agents_coords[1][1], 0.0, 0.0,
-                 0.0, 0.0]
+        return self._get_obs()
 
-    def close(self):
-        self.viewer.close() if self.viewer else None
-
-    def _read_grid_map(self, grid_map_path, file=True):
-
-        # Return the gridmap imported from a txt plan
-
-        if file:
-            grid_map = open(grid_map_path, 'r').readlines()
-        else:
-            grid_map = grid_map_path
-
-        grid_map_array = []
-        for k1 in grid_map:
-            k1s = k1.split(' ')
-            tmp_arr = []
-            for k2 in k1s:
-                try:
-                    tmp_arr.append(int(k2))
-                except:
-                    pass
-            grid_map_array.append(tmp_arr)
-        grid_map_array = np.array(grid_map_array, dtype=int)
-        return grid_map_array
-
-    def _get_agents_start_target_state(self):
-        start_state_1 = np.where(self.start_grid_map == AGENT1)
-        start_state_2 = np.where(self.start_grid_map == AGENT2)
-        target_state_1 = np.where(self.start_grid_map == TARGET1)
-        target_state_2 = np.where(self.start_grid_map == TARGET2)
-
-        # if neither state is found
-        start_or_target_not_found = not (start_state_1[0] and target_state_1[0]) or not (
-                start_state_2[0] and target_state_2[0])
-        if start_or_target_not_found:
-            sys.exit('Start or target state not specified')
-        start_state_1 = (start_state_1[0][0], start_state_1[1][0])
-        start_state_2 = (start_state_2[0][0], start_state_2[1][0])
-        target_state_1 = (target_state_1[0][0], target_state_1[1][0])
-        target_state_2 = (target_state_2[0][0], target_state_2[1][0])
-
-        return start_state_1, target_state_1, start_state_2, target_state_2
-
-    def _gridmap_to_image(self, img_shape=None):
-
-        # Return image from the gridmap
-
-        if img_shape is None:
-            img_shape = self.img_shape
-        observation = np.random.randn(*img_shape) * 0.0
-        gs0 = int(observation.shape[0] / self.current_grid_map.shape[0])
-        gs1 = int(observation.shape[1] / self.current_grid_map.shape[1])
-        for i in range(self.current_grid_map.shape[0]):
-            for j in range(self.current_grid_map.shape[1]):
-                for k in range(3):
-                    this_value = COLORS[self.current_grid_map[i, j]][k]
-                    observation[i * gs0:(i + 1) * gs0, j * gs1:(j + 1) * gs1, k] = this_value
-        return (255 * observation).astype(np.uint8)
-
-    def render(self, mode='human', close=False):
-
-        # Returns a visualization of the environment according to specification
-
-        if close:
-            plt.close(1)  # Final plot
-            return
-
+    def render(self, mode='human'):
         img = self._gridmap_to_image()
         if mode == 'rgb_array':
             return img
         elif mode == 'human':
-            plt.figure()
             plt.imshow(img)
-            return
-        elif mode=='write':
-            #if not os.path.exists("images/"):
-            #    os.makedirs("images/")
-            #plt.figure()
-            #plt.imshow(img)
-            self.grid_images.append(img)
-            #plt.savefig(f'images/anim{i}')
+            plt.show()
+
+    def _within_bounds(self, y, x):
+        return 0 <= y < self.current_grid_map.shape[0] and 0 <= x < self.current_grid_map.shape[1]
+
+    def _target_reached(self, agent_idx, y, x):
+        target = TARGET1 if agent_idx == 0 else TARGET2
+        return self.current_grid_map[y, x] == target
+
+    def _find_agents_and_targets(self):
+        start_coords = []
+        target_coords = []
+        for agent, target in [(AGENT1, TARGET1), (AGENT2, TARGET2)]:
+            sy, sx = np.where(self.start_grid_map == agent)
+            ty, tx = np.where(self.start_grid_map == target)
+            start_coords.append([sy[0], sx[0]])
+            target_coords.append([ty[0], tx[0]])
+        return np.array(start_coords), np.array(target_coords)
+
+    def _get_obs(self):
+        return self.current_grid_map
+
+    def _update_grid_map(self, old_coords, new_coords):
+        # self.current_grid_map = np.copy(self.start_grid_map)
+
+        old_grid_map = copy.deepcopy(self.current_grid_map)
+
+        for (y, x) in old_coords:
+            self.current_grid_map[y, x] = EMPTY
+
+        for idx, (y, x) in enumerate(new_coords):
+            self.current_grid_map[y, x] = AGENT1 if idx == 0 else AGENT2
+
+        if new_coords[0][0] == self.agents_target_coords[0][0] and new_coords[0][1] == self.agents_target_coords[0][1]:
+            self.current_grid_map[new_coords[0][0], new_coords[0][1]] = SUCCESS
+        if new_coords[1][0] == self.agents_target_coords[1][0] and new_coords[1][1] == self.agents_target_coords[1][1]:
+            self.current_grid_map[new_coords[1][0], new_coords[1][1]] = SUCCESS
+
+        # In case an agent is on the other agent's target
+        for i, (y, x) in enumerate(new_coords):
+            if self.current_grid_map[y, x] == AGENT1 and (old_grid_map[y, x] == TARGET2 or old_grid_map[y, x] == TARGET2_OC1):
+                self.current_grid_map[y, x] = TARGET2_OC1
+
+            if self.current_grid_map[y, x] == AGENT2 and (old_grid_map[y, x] == TARGET1 or old_grid_map[y, x] == TARGET1_OC2):
+                self.current_grid_map[y, x] = TARGET1_OC2
+
+        # Check if agent moved away from occupying the foreign target
+        if old_grid_map[old_coords[1][0], old_coords[1][1]] == TARGET1_OC2 and (new_coords[1][0] != old_coords[1][0] or new_coords[1][1] != old_coords[1][1]):
+            self.current_grid_map[old_coords[1][0], old_coords[1][1]] = TARGET1
+
+        if old_grid_map[old_coords[0][0], old_coords[0][1]] == TARGET2_OC1 and (new_coords[0][0] != old_coords[0][0] or new_coords[0][1] != old_coords[0][1]):
+            self.current_grid_map[old_coords[0][0], old_coords[0][1]] = TARGET2
+
+    def _gridmap_to_image(self):
+        img = np.zeros((*self.current_grid_map.shape, 3))
+        for i in range(self.current_grid_map.shape[0]):
+            for j in range(self.current_grid_map.shape[1]):
+                img[i, j] = COLORS[self.current_grid_map[i, j]]
+        return img
+
+    def _read_grid_map(self, grid_map_path):
+        with open(grid_map_path, 'r') as file:
+            grid_map = [[int(cell) for cell in line.split()] for line in file]
+        return np.array(grid_map, dtype=int)
+
+
+if __name__ == "__main__":
+    env = GridworldEnv('1', from_file=True)
+    obs = env.reset()
+    done = False
+    counter = 0
+
+    while not done:
+        counter += 1
+        actions = env.get_legal_action_pairs()[random.randint(0, len(env.get_legal_action_pairs()) - 1)]
+        obs, rewards, done = env.step(actions)
+
+    env.render()
+
+    #     #obs, rewards, done = env.step(actions)
+    #     #if done:
+    #     #    env.render()
+    #     if r < 0.0001:
+    #         print(r)
+    #         env.render()
