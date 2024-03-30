@@ -1,14 +1,12 @@
 import numpy as np
 import math
 from gridworld_env import GridworldEnv
-from algorithms.MultiDistral.MultiDistral_E_step.Soft_Q_Learning_without_rollout import Soft_without_rollout
 
 class MultiDistral:
     def __init__(self, TURN_LIMIT, ALPHA, GAMMA, TAU,ALGO):
         #self.env = env
         self.episode_reward_1 = 0.0
         self.episode_reward_2 = 0.0
-        #self.pi_0 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / (5)  # Initialize uniform prior policy
         self.pi_0_1 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / (5)  # Initialize uniform prior policy
         self.pi_0_2 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / (5)  # Initialize uniform prior policy
         self.turn_limit = TURN_LIMIT
@@ -22,15 +20,15 @@ class MultiDistral:
         self.env3=GridworldEnv('3')
         self.env4=GridworldEnv('4')
         self.env5=GridworldEnv('5')
-        self.list_envs=[self.env1,self.env2,self.env3,self.env4,self.env5]
+        self.list_envs=[self.env1, self.env2, self.env3, self.env4, self.env5]
 
     def optimise(self,version):
 
-        iterations=2
+        iterations=2000
         for i in range(iterations):
                
             # E STEP
-            num_games=10
+            num_games=100
             agents=[]
             p_player1=[]
             p_player2=[]
@@ -64,7 +62,7 @@ class MultiDistral:
                 
 
             # M STEP
-                
+
             if version==1: # 1 distilled policy per agent 
                 total_counts_1=np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
                 total_counts_2=np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
@@ -75,9 +73,9 @@ class MultiDistral:
                         counts1,counts2,_,_=agents[i].M_step(p_player1[i],p_player2[i])
                         total_counts_1+=counts1
                         total_counts_2+=counts2
-                
-                new_pi_0_1=total_counts_1/np.apply_over_axes(np.sum, total_counts_1, range(total_counts_1.ndim - 1)) #sum over all but last axis
-                new_pi_0_2=total_counts_2/np.apply_over_axes(np.sum, total_counts_2, range(total_counts_2.ndim - 1)) #sum over all but last axis
+
+                new_pi_0_1=total_counts_1/(np.apply_over_axes(np.sum, total_counts_1, range(total_counts_1.ndim - 1))) #sum over all but last axis
+                new_pi_0_2=total_counts_2/(np.apply_over_axes(np.sum, total_counts_2, range(total_counts_2.ndim - 1))) #sum over all but last axis
                 self.pi_0_1=new_pi_0_1 
                 self.pi_0_2=new_pi_0_2
                 
@@ -97,3 +95,5 @@ class MultiDistral:
                 # Change pi_0 just acquired
                 self.pi_0_1=new_pi_0
                 self.pi_0_2=new_pi_0
+
+        #print(self.pi_0_1)

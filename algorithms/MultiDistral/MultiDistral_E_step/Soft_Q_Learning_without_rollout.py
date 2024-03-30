@@ -16,8 +16,8 @@ class Soft_without_rollout:
         self.v_val_1 = np.zeros(7*9*7*9*5*2).reshape(7,9,7,9,5,2).astype(np.float32)
         self.q_val_2 = np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
         self.v_val_2 = np.zeros(7*9*7*9*5*2).reshape(7,9,7,9,5,2).astype(np.float32)
-        self.pi1 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)/5
-        self.pi2 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) /5
+        self.pi1 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / 5
+        self.pi2 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / 5
         self.lerning_count=LEARNING_COUNT
         self.turn_limit=TURN_LIMIT
         self.alpha=ALPHA 
@@ -26,7 +26,6 @@ class Soft_without_rollout:
         self.version=MultiDistral_version
         self.pi_0_1=pi01
         self.pi_0_2=pi02
-
 
         # THIS IS ALPHA IN THE ORIGINAL PAPER, TO DESIGNATE C_kl/c_kl+c_ent (here not called alpha cause that is the learning rate)
         self.psi=PSI
@@ -37,12 +36,16 @@ class Soft_without_rollout:
     # Function to find/act according to pi_i
     def action_selection(self, env, state, agent_id):
         if agent_id == 0:
+            # QUESTION: how can i get a q value without indexing the action?
             q_values = self.q_val_1[tuple(state)]
             v_value=self.v_val_1[tuple(state)]
             advantages=q_values-v_value
             log_action_probs = self.psi*np.log(self.pi_0_1[tuple(state)])+(self.beta*advantages)
-            probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
-            #print(probs)
+            # The advantage is always negative
+            #print(advantages)
+            #print(self.pi_0_1[tuple(state)])
+            #probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
+            probs = np.exp(log_action_probs - logsumexp(log_action_probs))
             action = np.random.choice(env.action_space[0].n, p=probs)
             #print(self.pi1[tuple(state)])
             self.pi1[tuple(state)]=probs
@@ -51,7 +54,7 @@ class Soft_without_rollout:
             v_value=self.v_val_2[tuple(state)]
             advantages=q_values-v_value
             log_action_probs = self.psi*np.log(self.pi_0_2[tuple(state)])+(self.beta*advantages)
-            probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
+            probs = np.exp(log_action_probs - logsumexp(log_action_probs))
             #print(probs)
             action = np.random.choice(env.action_space[1].n, p=probs)
             #print(self.pi2[tuple(state)])
@@ -61,10 +64,9 @@ class Soft_without_rollout:
 
     def learn(self,record=False):
         # one episode learning
-        state = self.env.reset()
+        self.env.reset()
         if self.version==2:
             self.pi_0_2=self.pi_0_1
-
 
         self.episode_reward_2=0
         self.episode_reward_1=0
@@ -76,7 +78,7 @@ class Soft_without_rollout:
         act1,_=self.action_selection(self.env,self.env.get_state_single(list(map(int,state)),1),1)
         if record:
             self.env.render(mode='write')
-        next_state, next_rewards,move_completed=self.env.step([act0,act1]) 
+        next_state, next_rewards,move_completed=self.env.step([act0,act1])
         rewards=[0,0]
         assert len(next_state) == 8
         a1_state=self.env.get_state_single(list(map(int,state)),0)
@@ -84,25 +86,22 @@ class Soft_without_rollout:
         a1_next_state=self.env.get_state_single(list(map(int,next_state)),0)
         a2_next_state=self.env.get_state_single(list(map(int,next_state)),1)
 
-        
         act0=int(act0)
         act1=int(act1)
-        current_state_1=a1_state+[act0]
-        
 
         # EQ (3) IN PAPER BUT MODEL FREE
         td_target = rewards[0] + self.gamma * self.v_val_1[tuple(a1_next_state)]
-        td_error = td_target - self.q_val_1[tuple(current_state_1)]
-        self.q_val_1[tuple(current_state_1)] += self.alpha * td_error
+        td_error = td_target - self.q_val_1[tuple(a1_state+[act0])]
+        self.q_val_1[tuple(a1_state+[act0])] += self.alpha * td_error
 
         # EQ (2) IN PAPER
         exp_q_val = np.exp(self.beta * self.q_val_1[tuple(a1_state)])
         # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
-        weighted_exp_q_val = np.multiply(self.pi_0_1[tuple(a1_state)],exp_q_val)
+        weighted_exp_q_val = np.multiply(np.power(self.pi_0_1[tuple(a1_state)],self.alpha),exp_q_val)
         weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
         #print(weighted_exp_q_val_sum)
         #print(self.v_val_1[tuple(a1_state)])
-        self.v_val_1[tuple(a1_state)]=1/self.beta * np.log(weighted_exp_q_val_sum)
+        self.v_val_1[tuple(a1_state)]= (1.0/self.beta) * np.log(weighted_exp_q_val_sum)
 
         current_state_2=a2_state+[act1]
         # EQ (3) IN PAPER BUT MODEL FREE
@@ -113,9 +112,9 @@ class Soft_without_rollout:
         # EQ (2) IN PAPER
         exp_q_val = np.exp(self.beta * self.q_val_2[tuple(a2_state)])
         # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
-        weighted_exp_q_val = np.multiply(self.pi_0_2[tuple(a2_state)], exp_q_val)
+        weighted_exp_q_val = np.multiply(np.power(self.pi_0_2[tuple(a2_state)],self.alpha), exp_q_val)
         weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
-        self.v_val_2[tuple(a2_state)]=1/self.beta * np.log(weighted_exp_q_val_sum)
+        self.v_val_2[tuple(a2_state)]=(1.0/self.beta) * np.log(weighted_exp_q_val_sum)
 
         state=next_state
         rewards=next_rewards
@@ -128,14 +127,11 @@ class Soft_without_rollout:
             self.episode_reward_1 += rewards[0]
             self.episode_reward_2 += rewards[1]
 
-            
-            
             act0,_=self.action_selection(self.env,self.env.get_state_single(list(map(int,state)),0),0)
             act1,_=self.action_selection(self.env,self.env.get_state_single(list(map(int,state)),1),1)
             next_state, next_rewards,move_completed=self.env.step([act0,act1]) 
             if record:
                 self.env.render(mode='write')
-
 
             assert len(next_state) == 8
             a1_state=self.env.get_state_single(list(map(int,state)),0)
@@ -151,7 +147,7 @@ class Soft_without_rollout:
             act0=int(act0)
             act1=int(act1)
             flag=False
-            if not (move_completed[0] and rewards[0]==0.0) :
+            if not (move_completed[0]):# and rewards[0]==0.0) :
                 current_state_1=a1_state+[act0]
                 flag=True
                 #print(current_state_1)
@@ -163,10 +159,11 @@ class Soft_without_rollout:
                 # EQ (2) IN PAPER
                 exp_q_val = np.exp(self.beta * self.q_val_1[tuple(a1_state)])
                 # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
-                weighted_exp_q_val = np.multiply(self.pi_0_1[tuple(a1_state)],exp_q_val)
+                weighted_exp_q_val = np.multiply(np.power(self.pi_0_1[tuple(a1_state)],self.alpha),exp_q_val)
                 weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
                 self.v_val_1[tuple(a1_state)]=1/self.beta * np.log(weighted_exp_q_val_sum)
-            if not (move_completed[1] and rewards[1]==0.0):
+
+            if not (move_completed[1]):# and rewards[0]==0.0) :
                 # EQ (3) IN PAPER BUT MODEL FREE
                 td_target = rewards[1] + self.gamma * self.v_val_2[tuple(a2_next_state)]
                 td_error = td_target - self.q_val_2[tuple(current_state_2)]
@@ -175,7 +172,7 @@ class Soft_without_rollout:
                 # EQ (2) IN PAPER
                 exp_q_val = np.exp(self.beta * self.q_val_2[tuple(a2_state)])
                 # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
-                weighted_exp_q_val = np.multiply(self.pi_0_2[tuple(a2_state)],exp_q_val)
+                weighted_exp_q_val = np.multiply(np.power(self.pi_0_2[tuple(a2_state)],self.alpha),exp_q_val)
                 weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
                 self.v_val_2[tuple(a2_state)]=1/self.beta * np.log(weighted_exp_q_val_sum)
             #if not flag:
@@ -188,8 +185,8 @@ class Soft_without_rollout:
         return self.env.episode_total_reward,self.episode_reward_1,self.episode_reward_2
 
     def M_step_action_selection(self,env,state1,state2,pi_i_1,pi_i_2):
-        print(pi_i_1[tuple(state1)])
-        print(pi_i_2[tuple(state2)])
+        #print(pi_i_1[tuple(state1)])
+        #print(pi_i_2[tuple(state2)])
         action1 = np.random.choice(env.action_space[0].n, p=pi_i_1[tuple(state1)])
         action2 = np.random.choice(env.action_space[1].n, p=pi_i_2[tuple(state2)])
         return action1,action2
@@ -212,19 +209,17 @@ class Soft_without_rollout:
         a2_next_state=self.env.get_state_single(list(map(int,next_state)),1)
         act0=int(act0)
         act1=int(act1)
-        counts_1[tuple(a1_state+[act0])]+=1
-        counts_2[tuple(a1_state+[act1])]+=1
+        counts_1[tuple(a1_state+[act0])] += 1
+        counts_2[tuple(a2_state+[act1])] += 1
 
         state=next_state
         rewards=next_rewards
         for t in range(1,self.turn_limit+1):
             if all(move_completed) and all(reward == 0 for reward in rewards):
                 return counts_1,counts_2,self.episode_reward_1,self.episode_reward_2
-            
                        
             self.episode_reward_1 += rewards[0]
             self.episode_reward_2 += rewards[1]
-
 
             act0,act1=self.M_step_action_selection(self.env,self.env.get_state_single(list(map(int,state)),0),self.env.get_state_single(list(map(int,state)),1),pi_i_1,pi_1_2)
 
@@ -241,8 +236,8 @@ class Soft_without_rollout:
             act1=int(act1)
 
             # counts discounted by discount rate as in formula
-            counts_1[tuple(a1_state+[act0])]+=self.gamma**t
-            counts_2[tuple(a1_state+[act1])]+=self.gamma**t
+            counts_1[tuple(a1_state+[act0])]+=np.power(self.gamma,t)
+            counts_2[tuple(a2_state+[act1])]+=np.power(self.gamma,t)
     
             state=next_state
             rewards=next_rewards

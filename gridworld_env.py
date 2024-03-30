@@ -42,7 +42,7 @@ class GridworldEnv(Env):
 
     def __init__(self, plan, from_file=True):
         super(GridworldEnv, self).__init__()
-        self.action_space = spaces.Discrete(len(ACTIONS))
+        self.action_space = {0: spaces.Discrete(5), 1: spaces.Discrete(5)}
         self.action_combinations = list(itertools.product(ACTIONS, repeat=2))
 
         # Load the grid map
@@ -65,9 +65,23 @@ class GridworldEnv(Env):
         self.viewer = None
         self.seed()
 
+        # Env state: [agent 1 x position (this is actually vertical axis, sorry abt naming), agent 1 y position (this is actually horizontal axis), agent 2 x position, agent 2 y position, agent 1 previous action, flag on whether player 1 has reached goal – 1 if true, agent 2 previous action, flag on whether player 2 has reached goal – 1 if true]
+        self.current_game_state = [self.current_agents_coords[0][0], self.current_agents_coords[0][1], self.current_agents_coords[1][0], self.current_agents_coords[1][1], NOOP, 0, NOOP, 0]
+
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
+
+    def get_state_single(self, state, agent_idx):
+        """
+        Returns the state for the specified agent from the combined state.
+        """
+        # state of env has coordinates p1 +coordinates p2 + p1 prev action +  p1 reward so far + p2 prev action  + p2 reward so far
+        # state of each agent should be coordinates p1 + coordinates p2 + their own prev action  + other agent's reward so far
+        if agent_idx==0:
+            return state[:5]+[state[7]]
+        else:
+            return state[:4]+[state[6]]+[state[5]]
 
     def get_legal_action_pairs(self):
         legal_action_pairs = []
@@ -109,7 +123,7 @@ class GridworldEnv(Env):
             new_y, new_x = y + dy, x + dx
 
             # Check for illegal moves
-            if not self._within_bounds(new_y, new_x) or self.current_grid_map[new_y, new_x] == WALL:
+            if not self.move_legal(actions):
                 rewards[agent_idx] = -0.1
                 continue
 
@@ -125,16 +139,19 @@ class GridworldEnv(Env):
         self._update_grid_map(self.current_agents_coords, new_agent_coords)
         self.current_agents_coords = new_agent_coords
 
+        self.current_game_state = [self.current_agents_coords[0][0], self.current_agents_coords[0][1], self.current_agents_coords[1][0], self.current_agents_coords[1][1], actions[0], int(self.move_completed[0]), actions[1], int(self.move_completed[1])]
+
         # Update game state and check if episode is done
         done = all(self.move_completed)
-        return self._get_obs(), rewards, done
+        return self.current_game_state, rewards, self.move_completed
 
     def reset(self):
         self.current_grid_map = np.copy(self.start_grid_map)
         self.current_agents_coords = np.copy(self.agents_start_coords)
         self.move_completed = [False, False]
         self.episode_total_reward = 0.0
-        return self._get_obs()
+        self.current_game_state = [self.current_agents_coords[0][0], self.current_agents_coords[0][1], self.current_agents_coords[1][0], self.current_agents_coords[1][1], NOOP, 0, NOOP, 0]
+        return self.current_game_state
 
     def render(self, mode='human'):
         img = self._gridmap_to_image()
@@ -160,9 +177,6 @@ class GridworldEnv(Env):
             start_coords.append([sy[0], sx[0]])
             target_coords.append([ty[0], tx[0]])
         return np.array(start_coords), np.array(target_coords)
-
-    def _get_obs(self):
-        return self.current_grid_map
 
     def _update_grid_map(self, old_coords, new_coords):
 
