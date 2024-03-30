@@ -116,10 +116,11 @@ class GridworldEnv(Env):
             if self._target_reached(agent_idx, new_y, new_x):
                 self.move_completed[agent_idx] = True
                 rewards[agent_idx] = 100.0
-                self.current_grid_map[new_y, new_x] = SUCCESS
+                #self.current_grid_map[new_y, new_x] = SUCCESS
             else:
                 rewards[agent_idx] = -0.1
-                new_agent_coords[agent_idx] = [new_y, new_x]
+
+            new_agent_coords[agent_idx] = [new_y, new_x]
 
         self._update_grid_map(self.current_agents_coords, new_agent_coords)
         self.current_agents_coords = new_agent_coords
@@ -164,7 +165,6 @@ class GridworldEnv(Env):
         return self.current_grid_map
 
     def _update_grid_map(self, old_coords, new_coords):
-        # self.current_grid_map = np.copy(self.start_grid_map)
 
         old_grid_map = copy.deepcopy(self.current_grid_map)
 
@@ -212,17 +212,18 @@ if __name__ == "__main__":
     obs = env.reset()
     done = False
     counter = 0
+    env.render()
+
+    total_rewards = [0., 0.]
 
     while not done:
         counter += 1
         actions = env.get_legal_action_pairs()[random.randint(0, len(env.get_legal_action_pairs()) - 1)]
         obs, rewards, done = env.step(actions)
+        total_rewards[0] += rewards[0]
+        total_rewards[1] += rewards[1]
 
+    print(f'Random walk needed {counter} steps to reach goal')
+    print(f'Total rewards: {total_rewards}')
     env.render()
 
-    #     #obs, rewards, done = env.step(actions)
-    #     #if done:
-    #     #    env.render()
-    #     if r < 0.0001:
-    #         print(r)
-    #         env.render()
