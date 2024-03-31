@@ -119,6 +119,16 @@ class GridworldEnv(Env):
         rewards = [0.0, 0.0]
         new_agent_coords = np.copy(self.current_agents_coords)
 
+        for i in range(self.current_grid_map.shape[0]):
+            for j in range(self.current_grid_map.shape[1]):
+                if self.current_grid_map[i, j] == AGENT1:
+                    self.move_completed[0] = False
+                if self.current_grid_map[i, j] == AGENT2:
+                    self.move_completed[1] = False
+
+        if type(actions) is not tuple and len(actions) != 2:
+            print(actions)
+
         for agent_idx, action in enumerate(actions):
             if self.move_completed[agent_idx]:
                 continue
@@ -226,7 +236,7 @@ class GridworldEnv(Env):
 
 
 if __name__ == "__main__":
-    env = GridworldEnv('1', from_file=True)
+    env = GridworldEnv('6', from_file=True)
     obs = env.reset()
     done = [False, False]
     counter = 0
@@ -240,9 +250,9 @@ if __name__ == "__main__":
         obs, rewards, done = env.step(actions)
         total_rewards[0] += rewards[0]
         total_rewards[1] += rewards[1]
-        img = env.render('rgb_array')
-        plt.imshow(img)
-        plt.savefig(f'images/{counter}.png')
+        #img = env.render('rgb_array')
+        #plt.imshow(img)
+        #plt.savefig(f'images/{counter}.png')
 
     print(f'Random walk needed {counter} steps to reach goal')
     print(f'Total rewards: {total_rewards}')

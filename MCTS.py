@@ -57,23 +57,19 @@ class MCTS:
             node.children.append(Node(new_env, node))
         return random.choice(node.children)  # Return a random child node
 
-    def simulate(self, node):
+    def simulate(self, node, reward_idx=0):
         current_depth = 0
         env_copy = copy.deepcopy(node.state)
         total_cum_reward = 0
+
         while current_depth < self.max_depth:
             sampled_actions = random.choice(env.get_legal_action_pairs())
             _, reward, agent_at_goal = env_copy.step(sampled_actions)
-            if agent_at_goal[0]:
+            if agent_at_goal[0] and agent_at_goal[1]:
                 break
             current_depth += 1
 
-            if not node.state.move_completed[0] and not node.state.move_completed[1]:
-                total_cum_reward += reward[0] + reward[1]
-            elif node.state.move_completed[0] and not node.state.move_completed[1]:
-                total_cum_reward += reward[1]
-            elif not node.state.move_completed[0] and node.state.move_completed[1]:
-                total_cum_reward += reward[0]
+            total_cum_reward += reward[0] + reward[1]
 
         return total_cum_reward
 
@@ -86,6 +82,7 @@ class MCTS:
     def run(self, initial_state):
         root = Node(initial_state)
 
+
         for _ in range(self.num_iterations):
             leaf = self.select_node(root)
             new_child = self.expand(leaf)
@@ -93,7 +90,7 @@ class MCTS:
             self.backpropagate(new_child, reward)
 
         # After running simulations, choose the action of the best performing child of the root
-        return max(root.children, key=lambda x: x.value / x.visits if x.visits > 0 else float('-inf')).state
+        return max(root.children, key=lambda x: x.value / x.visits if x.visits > 0 else float('-inf')).state, root
 
 @jit(nopython=True)
 def move_to_action(move):
@@ -123,7 +120,7 @@ def get_actions_from_env_diff(old_env, new_env):
 
 
 if __name__ == '__main__':
-    env = GridworldEnv(1)
+    env = GridworldEnv(6)
     env.reset()
     done = False
     runner_env = copy.deepcopy(env)
@@ -131,16 +128,16 @@ if __name__ == '__main__':
     counter = 0
     while not done:
         counter += 1
-        game = MCTS(runner_env, 100, max_depth=1000)
-        next_env = game.run(runner_env)
+        game = MCTS(runner_env, 100, max_depth=500)
+        next_env, root = game.run(runner_env)
 
         actions = get_actions_from_env_diff(runner_env, next_env)
         runner_env.step(actions)
-        if counter % 10 == 0:
-            runner_env.render()
+        #runner_env.render()
 
         print(runner_env.move_completed)
         done = all(runner_env.move_completed)
         print(runner_env.get_legal_action_pairs())
 
-    print('done')
+    runner_env.render()
+    print(f'done, took {counter} steps')
