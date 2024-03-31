@@ -133,7 +133,7 @@ if __name__ == '__main__':
 
         actions = get_actions_from_env_diff(runner_env, next_env)
         runner_env.step(actions)
-        #runner_env.render()
+        runner_env.render()
 
         print(runner_env.move_completed)
         done = all(runner_env.move_completed)

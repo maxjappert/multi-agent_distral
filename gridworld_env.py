@@ -119,13 +119,6 @@ class GridworldEnv(Env):
         rewards = [0.0, 0.0]
         new_agent_coords = np.copy(self.current_agents_coords)
 
-        for i in range(self.current_grid_map.shape[0]):
-            for j in range(self.current_grid_map.shape[1]):
-                if self.current_grid_map[i, j] == AGENT1:
-                    self.move_completed[0] = False
-                if self.current_grid_map[i, j] == AGENT2:
-                    self.move_completed[1] = False
-
         if type(actions) is not tuple and len(actions) != 2:
             print(actions)
 
