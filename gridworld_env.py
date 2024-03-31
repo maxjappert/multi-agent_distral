@@ -5,6 +5,7 @@ import random
 import sys
 
 import numpy as np
+import PIL.Image
 from gym import spaces, Env
 from gym.utils import seeding
 import matplotlib.pyplot as plt
@@ -105,6 +106,11 @@ class GridworldEnv(Env):
         y_1, x_1 = self.current_agents_coords[0][0] + dy_1, self.current_agents_coords[0][1] + dx_1
         y_2, x_2 = self.current_agents_coords[1][0] + dy_2, self.current_agents_coords[1][1] + dx_2
 
+        # If the agents switch positions that's illegal
+        if ((self.current_agents_coords[0][0] == y_2 and self.current_agents_coords[0][1] == x_2)
+                or (self.current_agents_coords[1][0] == y_1 and self.current_agents_coords[1][1] == x_1)):
+            return False
+
         return (self._within_bounds(y_1, x_1) and self._within_bounds(y_2, x_2)
                 and self.current_grid_map[y_1, x_1] != WALL and self.current_grid_map[y_2, x_2] != WALL
                 and (y_1, x_1) != (y_2, x_2))
@@ -129,7 +135,6 @@ class GridworldEnv(Env):
             if self._target_reached(agent_idx, new_y, new_x):
                 self.move_completed[agent_idx] = True
                 rewards[agent_idx] = 100.0
-                #self.current_grid_map[new_y, new_x] = SUCCESS
             else:
                 rewards[agent_idx] = -0.1
 
@@ -223,18 +228,21 @@ class GridworldEnv(Env):
 if __name__ == "__main__":
     env = GridworldEnv('1', from_file=True)
     obs = env.reset()
-    done = False
+    done = [False, False]
     counter = 0
     env.render()
 
     total_rewards = [0., 0.]
 
-    while not done:
+    while not all(done):
         counter += 1
         actions = env.get_legal_action_pairs()[random.randint(0, len(env.get_legal_action_pairs()) - 1)]
         obs, rewards, done = env.step(actions)
         total_rewards[0] += rewards[0]
         total_rewards[1] += rewards[1]
+        img = env.render('rgb_array')
+        plt.imshow(img)
+        plt.savefig(f'images/{counter}.png')
 
     print(f'Random walk needed {counter} steps to reach goal')
     print(f'Total rewards: {total_rewards}')

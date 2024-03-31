@@ -7,6 +7,18 @@ import random
 from gridworld_env import GridworldEnv
 from numba import jit
 
+def state_to_env(state, plan=1):
+    """
+    The state is represented as
+
+    (y1, x1, y2, x2, prev_act1, done1, prev_act2, done2)
+    """
+
+    new_env = GridworldEnv(1)
+
+    return
+
+
 
 class Node:
     def __init__(self, state, parent=None):
@@ -55,7 +67,13 @@ class MCTS:
             if agent_at_goal[0]:
                 break
             current_depth += 1
-            total_cum_reward += reward[1]
+
+            if not node.state.move_completed[0] and not node.state.move_completed[1]:
+                total_cum_reward += reward[0] + reward[1]
+            elif node.state.move_completed[0] and not node.state.move_completed[1]:
+                total_cum_reward += reward[1]
+            elif not node.state.move_completed[0] and node.state.move_completed[1]:
+                total_cum_reward += reward[0]
 
         return total_cum_reward
 
@@ -77,6 +95,7 @@ class MCTS:
         # After running simulations, choose the action of the best performing child of the root
         return max(root.children, key=lambda x: x.value / x.visits if x.visits > 0 else float('-inf')).state
 
+@jit(nopython=True)
 def move_to_action(move):
     if move == (0, 0):
         return 0
@@ -104,15 +123,24 @@ def get_actions_from_env_diff(old_env, new_env):
 
 
 if __name__ == '__main__':
-    env = GridworldEnv(6)
+    env = GridworldEnv(1)
     env.reset()
     done = False
     runner_env = copy.deepcopy(env)
 
+    counter = 0
     while not done:
-        game = MCTS(runner_env, 500, max_depth=1000)
+        counter += 1
+        game = MCTS(runner_env, 100, max_depth=1000)
         next_env = game.run(runner_env)
 
         actions = get_actions_from_env_diff(runner_env, next_env)
         runner_env.step(actions)
-        runner_env.render()
+        if counter % 10 == 0:
+            runner_env.render()
+
+        print(runner_env.move_completed)
+        done = all(runner_env.move_completed)
+        print(runner_env.get_legal_action_pairs())
+
+    print('done')
