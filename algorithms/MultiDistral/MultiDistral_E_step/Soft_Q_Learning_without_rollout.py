@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.special import logsumexp
 
-
 class Soft_without_rollout:
 
     def __init__(self, env,LEARNING_COUNT,TURN_LIMIT,ALPHA,GAMMA,TAU,PSI,BETA,MultiDistral_version,pi01,pi02):
@@ -16,6 +15,8 @@ class Soft_without_rollout:
         self.v_val_1 = np.zeros(7*9*7*9*5*2).reshape(7,9,7,9,5,2).astype(np.float32)
         self.q_val_2 = np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
         self.v_val_2 = np.zeros(7*9*7*9*5*2).reshape(7,9,7,9,5,2).astype(np.float32)
+
+        # Then what is this?
         self.pi1 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / 5
         self.pi2 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / 5
         self.lerning_count=LEARNING_COUNT
@@ -24,8 +25,11 @@ class Soft_without_rollout:
         self.gamma=GAMMA
         self.tau=TAU
         self.version=MultiDistral_version
+
+        # This must be the distilled policy i guess
         self.pi_0_1=pi01
         self.pi_0_2=pi02
+        self.eps = 1e-8
 
         # THIS IS ALPHA IN THE ORIGINAL PAPER, TO DESIGNATE C_kl/c_kl+c_ent (here not called alpha cause that is the learning rate)
         self.psi=PSI
@@ -39,8 +43,13 @@ class Soft_without_rollout:
             # QUESTION: how can i get a q value without indexing the action?
             q_values = self.q_val_1[tuple(state)]
             v_value=self.v_val_1[tuple(state)]
+            # the issue is that v_value becomes infinite
+            # QUESTION: is it normal that advantages are always <= 0?
             advantages=q_values-v_value
-            log_action_probs = self.psi*np.log(self.pi_0_1[tuple(state)])+(self.beta*advantages)
+            # print(v_value)
+            # print(q_values)
+            # print(q_values-v_value)
+            log_action_probs = self.psi*np.log(np.maximum(self.pi_0_1[tuple(state)], self.eps))+(self.beta*advantages)
             # The advantage is always negative
             #print(advantages)
             #print(self.pi_0_1[tuple(state)])
@@ -53,7 +62,7 @@ class Soft_without_rollout:
             q_values = self.q_val_2[tuple(state)]
             v_value=self.v_val_2[tuple(state)]
             advantages=q_values-v_value
-            log_action_probs = self.psi*np.log(self.pi_0_2[tuple(state)])+(self.beta*advantages)
+            log_action_probs = self.psi*np.log(np.maximum(self.pi_0_2[tuple(state)], self.eps))+(self.beta*advantages)
             probs = np.exp(log_action_probs - logsumexp(log_action_probs))
             #print(probs)
             action = np.random.choice(env.action_space[1].n, p=probs)
@@ -101,7 +110,7 @@ class Soft_without_rollout:
         weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
         #print(weighted_exp_q_val_sum)
         #print(self.v_val_1[tuple(a1_state)])
-        self.v_val_1[tuple(a1_state)]= (1.0/self.beta) * np.log(weighted_exp_q_val_sum)
+        self.v_val_1[tuple(a1_state)]= (1.0/self.beta) * np.log(np.maximum(weighted_exp_q_val_sum, self.eps))
 
         current_state_2=a2_state+[act1]
         # EQ (3) IN PAPER BUT MODEL FREE
@@ -114,7 +123,7 @@ class Soft_without_rollout:
         # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
         weighted_exp_q_val = np.multiply(np.power(self.pi_0_2[tuple(a2_state)],self.alpha), exp_q_val)
         weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
-        self.v_val_2[tuple(a2_state)]=(1.0/self.beta) * np.log(weighted_exp_q_val_sum)
+        self.v_val_2[tuple(a2_state)]=(1.0/self.beta) * np.log(np.maximum(weighted_exp_q_val_sum, self.eps))
 
         state=next_state
         rewards=next_rewards
@@ -161,7 +170,7 @@ class Soft_without_rollout:
                 # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
                 weighted_exp_q_val = np.multiply(np.power(self.pi_0_1[tuple(a1_state)],self.alpha),exp_q_val)
                 weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
-                self.v_val_1[tuple(a1_state)]=1/self.beta * np.log(weighted_exp_q_val_sum)
+                self.v_val_1[tuple(a1_state)]=(1./self.beta) * np.log(np.maximum(weighted_exp_q_val_sum, self.eps))
 
             if not (move_completed[1]):# and rewards[0]==0.0) :
                 # EQ (3) IN PAPER BUT MODEL FREE
@@ -174,7 +183,7 @@ class Soft_without_rollout:
                 # Compute ∑_at π_α^0(at|st) exp[βQi(at, st)]
                 weighted_exp_q_val = np.multiply(np.power(self.pi_0_2[tuple(a2_state)],self.alpha),exp_q_val)
                 weighted_exp_q_val_sum = weighted_exp_q_val.sum(axis=-1)
-                self.v_val_2[tuple(a2_state)]=1/self.beta * np.log(weighted_exp_q_val_sum)
+                self.v_val_2[tuple(a2_state)]=(1./self.beta) * np.log(np.maximum(weighted_exp_q_val_sum, self.eps))
             #if not flag:
             #   print(rewards)
             state=next_state
@@ -243,6 +252,6 @@ class Soft_without_rollout:
             rewards=next_rewards
 
         
-        #print(str(t+1)+" steps")        
+        #print(str(t+1)+" steps")
         return counts_1,counts_2,self.episode_reward_1,self.episode_reward_2
         
