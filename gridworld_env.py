@@ -24,7 +24,6 @@ COLORS = {
     SUCCESS: [1.0, 0.0, 1.0],  # Pink
     TARGET1_OC2: [0.5, 0.5, 0.5],
     TARGET2_OC1: [0.5, 0.5, 0.5],
-    TARGET2_OC1: [0.5, 0.5, 0.5]
 }
 
 # Define the action to position update mapping
