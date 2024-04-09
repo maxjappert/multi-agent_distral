@@ -38,6 +38,24 @@ class ActorNetwork(nn.Module):
 #         x = self.fc3(x)
 #         return x
 
+# class CriticNetwork(nn.Module):
+#     def __init__(self, state_dim, action_dim):
+#         super(CriticNetwork, self).__init__()
+#         self.fc1 = nn.Linear(state_dim + action_dim, 64)
+#         self.fc2 = nn.Linear(64, 64)
+#         self.fc3 = nn.Linear(64, 1)
+
+#     def forward(self, state, action):
+#         x = torch.cat([state, action], dim=1)
+#         k = torch.cat([state, action], dim=1)
+#         print(k.shape)  
+#         x = self.fc1(x)
+#         x = torch.relu(x)
+#         x = self.fc2(x)
+#         x = torch.relu(x)
+#         x = self.fc3(x)
+#         return x
+
 class CriticNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(CriticNetwork, self).__init__()
@@ -46,6 +64,9 @@ class CriticNetwork(nn.Module):
         self.fc3 = nn.Linear(64, 1)
 
     def forward(self, state, action):
+        # Ensure action tensor has a single dimension
+        action = action.view(-1, 1)  # Reshape action to (batch_size, 1)
+
         x = torch.cat([state, action], dim=1)
         x = self.fc1(x)
         x = torch.relu(x)
@@ -53,6 +74,7 @@ class CriticNetwork(nn.Module):
         x = torch.relu(x)
         x = self.fc3(x)
         return x
+
 
 
 class MADDPGAgent:
