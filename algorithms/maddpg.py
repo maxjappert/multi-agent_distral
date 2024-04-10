@@ -5,10 +5,57 @@ import torch.optim as optim
 from torch.distributions import Normal
 from gridworld_env import GridworldEnv
 
+# class ActorNetwork(nn.Module):
+#     def __init__(self, state_dim, action_dim):
+#         super(ActorNetwork, self).__init__()
+#         self.fc1 = nn.Linear(state_dim, 64)
+#         self.fc2 = nn.Linear(64, 64)
+#         self.fc3 = nn.Linear(64, action_dim)
+#         self.tanh = nn.Tanh()
+
+#     def forward(self, state):
+#         x = self.fc1(state)
+#         x = self.tanh(x)
+#         x = self.fc2(x)
+#         x = self.tanh(x)
+#         x = self.fc3(x)
+#         x = self.tanh(x)
+#         return x
+
+# class ActorNetwork(nn.Module):
+#     def __init__(self, state_dim, action_dim):
+#         super(ActorNetwork, self).__init__()
+#         self.fc1 = nn.Linear(state_dim // 2, 64)  # Divide state_dim by 2 to get the state size for each agent
+#         self.fc2 = nn.Linear(64, 64)
+#         self.fc3 = nn.Linear(64, action_dim)
+#         self.tanh = nn.Tanh()
+
+#     def forward(self, state):
+#         # Assuming the state tensor has the shape (batch_size, state_dim)
+#         # Split the state tensor into two parts, one for each agent
+#         state_1 = state[:, :state_dim // 2]
+#         state_2 = state[:, state_dim // 2:]
+
+#         x1 = self.fc1(state_1)
+#         x1 = self.tanh(x1)
+#         x1 = self.fc2(x1)
+#         x1 = self.tanh(x1)
+#         x1 = self.fc3(x1)
+#         x1 = self.tanh(x1)
+
+#         x2 = self.fc1(state_2)
+#         x2 = self.tanh(x2)
+#         x2 = self.fc2(x2)
+#         x2 = self.tanh(x2)
+#         x2 = self.fc3(x2)
+#         x2 = self.tanh(x2)
+
+#         return torch.cat([x1, x2], dim=1)  # Concatenate the actions for both agents
+
 class ActorNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(ActorNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 64)
+        self.fc1 = nn.Linear(state_dim // 2, 64)
         self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(64, action_dim)
         self.tanh = nn.Tanh()
@@ -20,6 +67,25 @@ class ActorNetwork(nn.Module):
         x = self.tanh(x)
         x = self.fc3(x)
         x = self.tanh(x)
+        return x
+
+class CriticNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super(CriticNetwork, self).__init__()
+        self.fc1 = nn.Linear(state_dim + action_dim, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 1)
+
+    def forward(self, state, action):
+        # Ensure action tensor has a single dimension
+        action = action.view(-1, action_dim)  # Reshape action to (batch_size, action_dim)
+
+        x = torch.cat([state, action], dim=1)
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.fc2(x)
+        x = torch.relu(x)
+        x = self.fc3(x)
         return x
 
 # class CriticNetwork(nn.Module):
@@ -56,34 +122,15 @@ class ActorNetwork(nn.Module):
 #         x = self.fc3(x)
 #         return x
 
-class CriticNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim):
-        super(CriticNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim + action_dim, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, 1)
-
-    def forward(self, state, action):
-        # Ensure action tensor has a single dimension
-        action = action.view(-1, 1)  # Reshape action to (batch_size, 1)
-
-        x = torch.cat([state, action], dim=1)
-        x = self.fc1(x)
-        x = torch.relu(x)
-        x = self.fc2(x)
-        x = torch.relu(x)
-        x = self.fc3(x)
-        return x
-
 
 
 class MADDPGAgent:
     def __init__(self, env, state_dim, action_dim, agent_id, lr_actor, lr_critic, gamma, tau):
         self.agent_id = agent_id
         self.env = env
-        self.actor = ActorNetwork(state_dim, action_dim)
+        self.actor = ActorNetwork(state_dim // 2, action_dim)  # Adjust state_dim for individual agent
         self.critic = CriticNetwork(state_dim, action_dim)
-        self.actor_target = ActorNetwork(state_dim, action_dim)
+        self.actor_target = ActorNetwork(state_dim // 2, action_dim)  # Adjust state_dim for individual agent
         self.critic_target = CriticNetwork(state_dim, action_dim)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
@@ -99,6 +146,7 @@ class MADDPGAgent:
             return self.env.action_space[self.agent_id].sample()
         else:
             state = torch.FloatTensor(state)
+            state = state[:, self.agent_id * (state_dim // 2):(self.agent_id + 1) * (state_dim // 2)]  # Extract agent's own state
             action = self.actor(state)
             return action.detach().numpy()
 
@@ -110,7 +158,7 @@ class MADDPGAgent:
         done = torch.FloatTensor(batch['done'])
 
         # Update critic network
-        next_actions = torch.cat([agent.actor_target(next_state[:, i*state_dim:(i+1)*state_dim]) for i, agent in enumerate(other_agents)], dim=1)
+        next_actions = torch.cat([agent.actor_target(next_state) for agent in other_agents], dim=1)
         target_q = self.critic_target(next_state, next_actions)
         expected_q = reward + self.gamma * (1 - done) * target_q
         critic_loss = nn.MSELoss()(self.critic(state, action), expected_q.detach())
@@ -119,8 +167,9 @@ class MADDPGAgent:
         self.critic_optimizer.step()
 
         # Update actor network
-        my_action = self.actor(state[:, self.agent_id*state_dim:(self.agent_id+1)*state_dim])
-        actor_loss = -self.critic(state, torch.cat([agent.actor(state[:, i*state_dim:(i+1)*state_dim]) for i, agent in enumerate(other_agents)], dim=1))
+        my_action = self.actor(state[:, self.agent_id * (state_dim // 2):(self.agent_id + 1) * (state_dim // 2)])
+        other_actions = torch.cat([agent.actor(state[:, i * (state_dim // 2):(i + 1) * (state_dim // 2)]) for i, agent in enumerate(other_agents) if i != self.agent_id], dim=1)
+        actor_loss = -self.critic(state[:, self.agent_id * (state_dim // 2):(self.agent_id + 1) * (state_dim // 2)], torch.cat([my_action, other_actions], dim=1))
         actor_loss = actor_loss.mean()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -195,7 +244,7 @@ class ReplayBuffer:
 
 if __name__ == "__main__":
     env = GridworldEnv('6', from_file=True)
-    state_dim = 8
+    state_dim = 64
     action_dim = 5
     num_agents = 2
     lr_actor = 1e-4
