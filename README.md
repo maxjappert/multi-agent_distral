@@ -19,15 +19,15 @@
 |   ├── task5.txt
 |   ├── task6.txt
 ├── GridWorld-Test.ipynb
-├── MCTS.py
+├── MCTS.py                 # Monte Carlo Tree Search 
 ├── MultiDistral.ipynb
-├── environment.yml       # installing dependencies 
+├── environment.yml         # installing dependencies 
 ├── gridworld_env.py
 ├── maddpg.ipynb
 ├── new_gridworld.ipynb
 ├── maddpg.ipynb
-├── plotting.py           # plotting utils
+├── plotting.py             # plotting utils
 ├── render_animation.py
 ├── soft_q-learning_test.py
-├── testing.ipynb        # q-learning policy plots and render animation
+├── testing.ipynb           # q-learning policy plots and render animation
 ```
