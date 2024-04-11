@@ -103,9 +103,6 @@ class Soft_without_rollout:
         #act0=self.softmax_action_selection(self.env,self.env.get_state_single(list(map(int,state)),0),0, t=t)
         #act1=self.softmax_action_selection(self.env,self.env.get_state_single(list(map(int,state)),1),1, t=t)
 
-        if t % 10 == 0 and random.random() < 0.1:
-            print(self.update_epsilon(t))
-
         act0, act1 = self.epsilon_greedy(self.env, self.update_epsilon(t))
 
         #act1 = 0
