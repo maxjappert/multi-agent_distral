@@ -22,10 +22,9 @@ class MultiDistral:
         self.env2=GridworldEnv('2')
         self.env3=GridworldEnv('3')
 
-        # Remove to test learning without task 4
         self.env4=GridworldEnv('4')
         self.env5=GridworldEnv('5')
-        #Also remove self.env4 from this list if you want to test learning without the 4th task
+
         self.list_envs=[self.env1, self.env2, self.env3, self.env4,self.env5]
         self.beta=BETA
 

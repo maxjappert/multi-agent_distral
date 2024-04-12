@@ -16,7 +16,6 @@ class Soft_without_rollout:
         self.q_val_2 = np.zeros(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32)
         self.v_val_2 = np.zeros(7*9*7*9*5*2).reshape(7,9,7,9,5,2).astype(np.float32)
 
-        # Then what is this?
         self.pi1 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / 5
         self.pi2 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / 5
         self.lerning_count=LEARNING_COUNT
