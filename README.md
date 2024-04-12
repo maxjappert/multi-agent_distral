@@ -46,7 +46,7 @@ A visual render of our environment (lighter color is the agent's starting positi
 
 <br>
 Q-Learning baseline policy plot:
-
+<br>
 <div style="display: flex; justify-content: center;">
 <img src="policy.png" alt="structure" width="60%" />
 </div>
