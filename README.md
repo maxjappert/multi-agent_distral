@@ -34,7 +34,7 @@ the MultiDistral implementation, including the soft q-learning algorithm used in
 `maddpg.ipynb` is an attempt at implementing MADDPG for the given environments, yet it doesn't work and is not considered
 in the report.
 
-## Acknowledgements
+## Acknowledgments
 
 `maddpg.ipynb` authered by Vishrut Malik, the rest authered by Samuel Oliveira and Max Jappert. Implemented as
 part of the Multi-Agent Artificial Intelligence (COMP0124) course taught by Professor Jun Wang at University College London.
