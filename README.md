@@ -4,30 +4,29 @@
 ├── algorithms          # implementation of baseline and multi-agent algorithms
 |   ├── MultiDistral
 |   |   ├── MultiDistral_E_step
-|   |   |   ├── Soft_Q_Learning_without_rollout.py #
+|   |   |   ├── Soft_Q_Learning_without_rollout.py   # Soft Q-Learning without rollout
 |   |   ├── MultiDistral.py #
-|   ├── Q_Learning.py
+|   ├── Q_Learning.py                          # Q-Learning baseline
 |   ├── Q_learning_rollout.py
-|   ├── Soft_Q_Learning_Baseline.py
+|   ├── Soft_Q_Learning_Baseline.py            # Soft Q-Learning with 10-step rollout
 |   ├── Soft_Q_Learning_without_rollout.py
-|   ├── maddpg.py
-├── tasks #n tasks for MultiTask RL (Distral Implementation)
+|   ├── maddpg.py                               # MADDPG 
+├── tasks                                     # n tasks for MultiTask RL (Distral Implementation)
 |   ├── task1.txt
 |   ├── task2.txt
 |   ├── task3.txt
 |   ├── task4.txt
 |   ├── task5.txt
 |   ├── task6.txt
-├── GridWorld-Test.ipynb
+├── GridWorld-Test.ipynb    # GridWorld Env plots and simulation
 ├── MCTS.py                 # Monte Carlo Tree Search 
-├── MultiDistral.ipynb
+├── MultiDistral.ipynb      # Multi-Distral Tests
 ├── environment.yml         # installing dependencies 
-├── gridworld_env.py
-├── maddpg.ipynb
+├── gridworld_env.py          
 ├── new_gridworld.ipynb
 ├── maddpg.ipynb
 ├── plotting.py             # plotting utils
-├── render_animation.py
-├── soft_q-learning_test.py
+├── render_animation.py     # animation utils
+├── soft_q-learning_test.py  
 ├── testing.ipynb           # q-learning policy plots and render animation
 ```
