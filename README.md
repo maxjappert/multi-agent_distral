@@ -1,6 +1,6 @@
 # Multi-Agent Distral
 
-This is the repository for our Multi-Agent AI Project. We extend the Distral algorithm from [Distral: Robust Multitask Reinforcement Learning](https://proceedings.neurips.cc/paper_files/paper/2017/file/0abdc563a06105aee3c6136871c9f4d1-Paper.pdf). 
+This is the repository for our Multi-Agent AI Project. We extend the Multi-Task single-agent Distral algorithm from [Distral: Robust Multitask Reinforcement Learning](https://proceedings.neurips.cc/paper_files/paper/2017/file/0abdc563a06105aee3c6136871c9f4d1-Paper.pdf) to a Multi-Task Multi-Agent setting in a cooperative environment.
 
 
 ```
@@ -33,3 +33,5 @@ This is the repository for our Multi-Agent AI Project. We extend the Distral alg
 ├── soft_q-learning_test.py  
 ├── testing.ipynb           # q-learning policy plots and render animation
 ```
+
+
