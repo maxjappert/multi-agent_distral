@@ -34,4 +34,16 @@ This is the repository for our Multi-Agent AI Project. We extend the Multi-Task 
 ├── testing.ipynb           # q-learning policy plots and render animation
 ```
 
+## The Environment:
 
+A visual render of our environment (lighter color is the agent's starting position and the darker color is its target position):
+
+<div style="display: flex; justify-content: center;">
+<img src="env.png" alt="structure" width="60%" />
+</div>
+
+Q-Learning baseline policy plot:
+
+<div style="display: flex; justify-content: center;">
+<img src="policy.png" alt="structure" width="60%" />
+</div>
