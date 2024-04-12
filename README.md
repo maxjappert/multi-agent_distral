@@ -3,7 +3,7 @@
 This repository contains the code for MultiDistral, a multi-agent implementation of Distral (Teh et al., 2017).
 The MultiDistral implementation tries to solve the following grid environments:
 
-![img.png](img.png)
+![envs.png](envs.png)
 
 The light green square is agent 1, the pink square is agent 2. The corresponding darker squares are each agent's target.
 Essentially, the challenge is to coordinate which agent can pass through the tunnel, a task only possible if one agent
