@@ -22,20 +22,10 @@ class Soft_Q_Learning_Baseline_Agents:
         if agent_id == 0:
             q_values = self.q_val_1[tuple(state)]
             log_action_probs = (q_values / self.tau)-logsumexp((q_values / self.tau))
-            #action_probs=np.nan_to_num(action_probs)
-            #action_probs=action_probs/np.sum(action_probs)
-            #print(log_action_probs)
-            #probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
-            #print(probs)
             action = np.random.choice(env.action_space[0].n, p=np.exp(log_action_probs))
         else:
             q_values = self.q_val_2[tuple(state)]
             log_action_probs = (q_values / self.tau)-logsumexp((q_values / self.tau))
-            #action_probs=np.nan_to_num(action_probs)
-            #action_probs=action_probs/np.sum(action_probs)
-            #print(log_action_probs)
-            #probs=np.exp(log_action_probs)/np.sum(np.exp(log_action_probs))
-            #print(probs)
             action = np.random.choice(env.action_space[0].n, p=np.exp(log_action_probs))
         return action
 
@@ -86,8 +76,6 @@ class Soft_Q_Learning_Baseline_Agents:
             a1_next_state = self.env.get_state_single(list(map(int, next_state)), 0)
             a2_next_state = self.env.get_state_single(list(map(int, next_state)), 1)
 
-            #states_1.append(a1_state)
-            #states_2.append(a2_state)
             actions_1.append(act0)
             actions_2.append(act1)
             rewards_1.append(rewards[0])

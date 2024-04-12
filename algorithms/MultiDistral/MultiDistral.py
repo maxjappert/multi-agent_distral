@@ -7,7 +7,7 @@ from gridworld_env import GridworldEnv
 
 class MultiDistral:
     def __init__(self, TURN_LIMIT, ALPHA, GAMMA,BETA,ALGO):
-        #self.env = env
+
         self.episode_reward_1 = 0.0
         self.episode_reward_2 = 0.0
         self.pi_0_1 = np.ones(7*9*7*9*5*2*5).reshape(7,9,7,9,5,2,5).astype(np.float32) / (5)  # Initialize uniform prior policy
@@ -21,7 +21,7 @@ class MultiDistral:
         self.env1=GridworldEnv('1')
         self.env2=GridworldEnv('2')
         self.env3=GridworldEnv('3')
-
+        # comment line below, and remove self.env4 from list in line 28 to test without tast 4
         self.env4=GridworldEnv('4')
         self.env5=GridworldEnv('5')
 
@@ -38,10 +38,8 @@ class MultiDistral:
         num_games = 30
 
         for i in range(iterations):
-            #if (i+1) % 5 == 0:
+
             print(f'Iteration {i+1}')
-                #print(self.pi_0_1)
-                #print(self.pi_0_2)
                
             # E STEP
             agents=[]
@@ -145,5 +143,3 @@ class MultiDistral:
 
         plt.plot(list(range(1,iterations+1)), p1_total_rewards/(num_games*len(self.list_envs)))
         plt.plot(list(range(1,iterations+1)), p2_total_rewards/(num_games*len(self.list_envs)))
-
-        #print(self.pi_0_1)

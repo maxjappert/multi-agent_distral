@@ -59,8 +59,7 @@ class Q_Learning_Agents:
         self.episode_reward_1=0
         state=self.env.current_game_state
         move_completed=[False,False]
-        #agent_0_has_finished=False
-        #agent_1_has_finished=False
+
         act0,act1=self.epsilon_greedy(self.env,epsilon)
         if record:
             self.env.render(mode='write')

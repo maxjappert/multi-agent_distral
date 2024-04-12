@@ -19,14 +19,7 @@ AGENT1 = L_GREEN = 4
 AGENT2 = L_RED = 5
 SUCCESS = PINK = 6
 
-# NOTe to Max: This isn't necessarily something you need to do, I'm just thinking abt whether this env makes it easy to connect to algorithms.
-# So the goal would be to do tabular RL: we would basically have a very large data structure with all the variables that define an agent's state
-# (i.e. the sextuple defined below) and then use an algo to learn the value of each of these (think of it like Q-Learning).
-# Just wanted you to think whether the environment makes sense to do this, since you know the code better.
 
-# NOTe to MAX: (the colour chocie is confusing imo, better if agent and its goal are same colour (but e.g. diff shades))
-# I made it so that agent 1 is a dark and agent 2 a light shade of green/red
-# This is only for visualising the environment
 COLORS = {BLACK: [0.0, 0.0, 0.0], GRAY: [0.5, 0.5, 0.5], D_GREEN: [0.0, 0.4, 0.0],
           D_RED: [0.4, 0.0, 0.0], L_GREEN: [0.5, 1.0, 0.5], L_RED: [1.0, 0.5, 0.5], PINK: [1.0, 0.0, 1.0]}
 
@@ -236,9 +229,7 @@ class GridworldEnv:
 
                 # if the opponent moves to the square the player was just in. (this is no longer allowed!)
                 # Note if the current player is player 1 (idx=0), we dont want to update the square to empty, as that would mess with the checks of valid move for player 2
-                # elif updated_agent_coords_list[opponent]== self.current_agents_coords[agent_idx]:
-                #    if opponent==0:
-                #       self.current_grid_map[self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = AGENT1
+
                 else:
                     self.current_grid_map[
                         self.current_agents_coords[agent_idx][0], self.current_agents_coords[agent_idx][1]] = EMPTY

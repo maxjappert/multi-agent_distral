@@ -79,17 +79,6 @@ class Soft_without_rollout:
             #action = np.argmax(action_probs)
         return action
 
-    # def softmax_action_selection(self, env, state, agent_id):
-    #     if agent_id == 0:
-    #         q_values = self.q_val_1[tuple(state)]
-    #         log_action_probs = (q_values / self.tau)-logsumexp((q_values / self.tau))
-    #         action = np.random.choice(env.action_space[0].n, p=np.exp(log_action_probs))
-    #     else:
-    #         q_values = self.q_val_2[tuple(state)]
-    #         log_action_probs = (q_values / self.tau)-logsumexp((q_values / self.tau))
-    #         action = np.random.choice(env.action_space[1].n, p=np.exp(log_action_probs))
-    #     return action
-
     def learn(self, t, record=False):
         # one episode learning
         self.env.reset()
@@ -98,10 +87,7 @@ class Soft_without_rollout:
         self.episode_reward_1=0
         state=self.env.current_game_state
         move_completed=[False,False]
-        #agent_0_has_finished=False
-        #agent_1_has_finished=False
-        #act0=self.softmax_action_selection(self.env,self.env.get_state_single(list(map(int,state)),0),0, t=t)
-        #act1=self.softmax_action_selection(self.env,self.env.get_state_single(list(map(int,state)),1),1, t=t)
+
 
         act0, act1 = self.epsilon_greedy(self.env, self.update_epsilon(t))
 
@@ -169,8 +155,6 @@ class Soft_without_rollout:
 
             #Env state has 8 variables. Each agent's state only has 7!
             
-            #q_next_max_1=np.max(self.q_val_1[tuple(a1_next_state)])
-            #q_next_max_2=np.max(self.q_val_2[tuple(a2_next_state)])
 
             act0=int(act0)
             act1=int(act1)
@@ -199,8 +183,7 @@ class Soft_without_rollout:
                 td_target = rewards[1] + self.gamma * q_next_max_2
                 td_error = td_target - self.q_val_2[tuple(current_state_2)]
                 self.q_val_2[tuple(current_state_2)] += self.alpha * td_error
-            #if not flag:
-            #   print(rewards)
+
             state=next_state
             rewards=next_rewards
 
