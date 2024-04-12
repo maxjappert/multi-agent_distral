@@ -93,8 +93,8 @@ class Soft_Q_Learning_Baseline_Agents:
             rewards_1.append(rewards[0])
             rewards_2.append(rewards[1])
 
-            self.episode_reward_1 += rewards[0]
-            self.episode_reward_2 += rewards[1]
+            self.episode_reward_1 += (rewards[0]*(self.gamma**t))
+            self.episode_reward_2 += (rewards[1]*(self.gamma**t))
 
 
             if all(move_completed) or len(states_1) >= 10:

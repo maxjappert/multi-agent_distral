@@ -150,8 +150,8 @@ class Soft_without_rollout:
             if all(move_completed) and all(reward == 0 for reward in rewards):
                 return self.env.episode_total_reward,self.episode_reward_1,self.episode_reward_2
 
-            self.episode_reward_1 += rewards[0]
-            self.episode_reward_2 += rewards[1]
+            self.episode_reward_1 += (rewards[0]*(self.gamma**t))
+            self.episode_reward_2 += (rewards[1]*(self.gamma**t))
 
             #act0=self.softmax_action_selection(self.env,self.env.get_state_single(list(map(int,state)),0),0, t=t)
             #act1=self.softmax_action_selection(self.env,self.env.get_state_single(list(map(int,state)),1),1, t=t)
